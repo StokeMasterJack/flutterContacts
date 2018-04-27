@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 const title = 'Flutter Blackjack';
 
 class BlackjackPage extends StatefulWidget {
-  BlackjackPage({Key key, this.viewBuilder}) : super(key: key);
+  BlackjackPage({Key key, this.viewBuilder, this.shuffle: true}) : super(key: key);
 
+  final bool shuffle;
   final GameViewBuilder viewBuilder;
 
   @override
@@ -14,8 +15,8 @@ class BlackjackPage extends StatefulWidget {
 }
 
 class _AppState extends State<BlackjackPage> {
-  bj.Game _game = new bj.Game();
-
+  bj.Game _game;
+  
   void _hit() {
     setState(() {
       _game.hit();
@@ -32,6 +33,13 @@ class _AppState extends State<BlackjackPage> {
     setState(() {
       _game.deal();
     });
+  }
+
+
+  @override
+  void initState() {
+    super.initState();
+    _game = new bj.Game(shuffle: widget.shuffle);
   }
 
   @override

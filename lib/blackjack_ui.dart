@@ -85,18 +85,21 @@ class ButtonsView extends StatelessWidget {
       children: <Widget>[
         isGameOver
             ? new RaisedButton(
+                key: new Key("Deal"),
                 child: new Text("Deal"),
                 onPressed: onDeal,
               )
             : null,
         !isGameOver
             ? new RaisedButton(
+                key: new Key("Hit"),
                 child: new Text("Hit"),
                 onPressed: onHit,
               )
             : null,
         !isGameOver
             ? new RaisedButton(
+                key: new Key("Stay"),
                 child: new Text("Stay"),
                 onPressed: onStay,
               )

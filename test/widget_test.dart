@@ -5,18 +5,39 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(new BlackjackPageText());
+    await tester.pumpWidget(new App(
+      shuffle: false,
+    ));
 
     // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Text Blackjack'), findsOneWidget);
+    expect(find.text('Graphic Blackjack'), findsOneWidget);
+    expect(find.text('Press Hit or Stay'), findsNothing);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(find.byKey(new Key("Text")));
+
+    await tester.pump();
+    await tester.pump();
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Press Hit or Stay'), findsOneWidget);
+    expect(find.text('Hit'), findsOneWidget);
+
+    expect(find.text('4 points'), findsOneWidget);
+    expect(find.text('6 points'), findsOneWidget);
+
+    await tester.tap(find.byKey(new Key("Hit")));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('9 points'), findsOneWidget);
+    expect(find.text('6 points'), findsOneWidget);
+
+    await tester.tap(find.byKey(new Key("Stay")));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('9 points'), findsOneWidget);
+    expect(find.text('19 points'), findsOneWidget);
   });
 }
