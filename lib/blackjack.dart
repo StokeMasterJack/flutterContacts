@@ -44,6 +44,12 @@ class Card {
     if (value >= 11 && value <= 13) return 10;
     throw new StateError("Bad value $value");
   }
+
+  String get imageName  {
+    String vChar = value != 10?valueName[0]:"t";
+    String sChar = suitName[0];
+    return "${vChar}${sChar}.gif".toLowerCase();
+  }
 }
 
 class Hand {

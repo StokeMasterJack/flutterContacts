@@ -12,6 +12,8 @@ dependencies:
   cupertino_icons: ^0.1.0
 
 dev_dependencies:
+  path: "^1.5.1"
+  image: "^1.1.31"
   flutter_test:
     sdk: flutter
 
@@ -31,6 +33,60 @@ flutter:
   # assets:
   #  - images/a_dot_burr.jpeg
   #  - images/a_dot_ham.jpeg
+
+  assets:
+    - images/2c.gif
+    - images/2d.gif
+    - images/2h.gif
+    - images/2s.gif
+    - images/3c.gif
+    - images/3d.gif
+    - images/3h.gif
+    - images/3s.gif
+    - images/4c.gif
+    - images/4d.gif
+    - images/4h.gif
+    - images/4s.gif
+    - images/5c.gif
+    - images/5d.gif
+    - images/5h.gif
+    - images/5s.gif
+    - images/6c.gif
+    - images/6d.gif
+    - images/6h.gif
+    - images/6s.gif
+    - images/7c.gif
+    - images/7d.gif
+    - images/7h.gif
+    - images/7s.gif
+    - images/8c.gif
+    - images/8d.gif
+    - images/8h.gif
+    - images/8s.gif
+    - images/9c.gif
+    - images/9d.gif
+    - images/9h.gif
+    - images/9s.gif
+    - images/ac.gif
+    - images/ad.gif
+    - images/ah.gif
+    - images/as.gif
+    - images/jc.gif
+    - images/jd.gif
+    - images/jh.gif
+    - images/js.gif
+    - images/kc.gif
+    - images/kd.gif
+    - images/kh.gif
+    - images/ks.gif
+    - images/qc.gif
+    - images/qd.gif
+    - images/qh.gif
+    - images/qs.gif
+    - images/tc.gif
+    - images/td.gif
+    - images/th.gif
+    - images/ts.gif
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.io/assets-and-images/#resolution-aware.

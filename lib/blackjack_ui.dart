@@ -1,44 +1,10 @@
-import 'package:blackjack/blackjack.dart';
+import 'package:blackjack/blackjack.dart' as bj;
 import 'package:flutter/material.dart';
 
 const title = 'Flutter Blackjack';
 
-class App extends StatefulWidget {
-  App({Key key}) : super(key: key);
-
-  @override
-  _AppState createState() => new _AppState();
-}
-
-class _AppState extends State<App> {
-  Game _game = new Game();
-
-  void _hit() {
-    setState(() {
-      _game.hit();
-    });
-  }
-
-  void _stay() {
-    setState(() {
-      _game.stay();
-    });
-  }
-
-  void _deal() {
-    setState(() {
-      _game.deal();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return new GameView(_game.copy(), _deal, _hit, _stay);
-  }
-}
-
 class GameView extends StatelessWidget {
-  final Game game;
+  final bj.Game game;
   final VoidCallback onDeal;
   final VoidCallback onHit;
   final VoidCallback onStay;
@@ -58,25 +24,16 @@ class GameView extends StatelessWidget {
       new Text(game.msg, style: Theme.of(context).textTheme.headline)
     ]);
 
-    var materialApp = new MaterialApp(
-        title: title,
-        theme: new ThemeData(scaffoldBackgroundColor: Colors.green),
-        home: new Scaffold(
-            appBar: new AppBar(
-              title: new Text(title),
-            ),
-            body: Container(
-              padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 12.0).copyWith(bottom: 12.0),
-              constraints: BoxConstraints(maxHeight: 300.00),
-              child: mainCol,
-            )));
-
-    return materialApp;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 0.0, horizontal: 12.0).copyWith(bottom: 12.0),
+      constraints: BoxConstraints(maxHeight: 340.00),
+      child: mainCol,
+    );
   }
 }
 
 class HandView extends StatelessWidget {
-  final Hand hand;
+  final bj.Hand hand;
 
   HandView(this.hand);
 
@@ -95,17 +52,21 @@ class HandView extends StatelessWidget {
                 padding: EdgeInsets.only(bottom: 5.0),
                 child: new Text(hand.name + " Hand", style: Theme.of(context).textTheme.body2),
               ),
-              new Expanded(
-                  child: new Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: hand.cards
-                          .map((c) => new Text(
-                                c.name,
-                                style: Theme.of(context).textTheme.body1,
-                              ))
-                          .toList())),
+              buildCardsView1(context, hand.cards),
               new Text(hand.points.toString() + " points", style: Theme.of(context).textTheme.body2),
             ])));
+  }
+
+  Widget buildCardsView1(BuildContext context, List<bj.Card> cards) {
+    return new Expanded(
+        child: new Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: hand.cards
+                .map((bj.Card c) => new Text(
+                      c.name,
+                      style: Theme.of(context).textTheme.body1,
+                    ))
+                .toList()));
   }
 }
 
