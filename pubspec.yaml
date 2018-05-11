@@ -1,7 +1,13 @@
-name: blackjack
-description: A new Flutter project.
+name: contacts
+description: Flutter Contacts
 
 dependencies:
+  ssutil:
+    path: "../ssutil/"
+  ssutil_flutter:
+    path: "../ssutil_flutter/"
+  collection: "^1.14.6"
+  path_provider: "^0.4.0"
   meta: "^1.1.2"
   quiver: '>=0.28.0 <0.30.0'
   flutter:
@@ -30,63 +36,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #  - images/a_dot_burr.jpeg
-  #  - images/a_dot_ham.jpeg
 
   assets:
-    - images/2c.gif
-    - images/2d.gif
-    - images/2h.gif
-    - images/2s.gif
-    - images/3c.gif
-    - images/3d.gif
-    - images/3h.gif
-    - images/3s.gif
-    - images/4c.gif
-    - images/4d.gif
-    - images/4h.gif
-    - images/4s.gif
-    - images/5c.gif
-    - images/5d.gif
-    - images/5h.gif
-    - images/5s.gif
-    - images/6c.gif
-    - images/6d.gif
-    - images/6h.gif
-    - images/6s.gif
-    - images/7c.gif
-    - images/7d.gif
-    - images/7h.gif
-    - images/7s.gif
-    - images/8c.gif
-    - images/8d.gif
-    - images/8h.gif
-    - images/8s.gif
-    - images/9c.gif
-    - images/9d.gif
-    - images/9h.gif
-    - images/9s.gif
-    - images/ac.gif
-    - images/ad.gif
-    - images/ah.gif
-    - images/as.gif
-    - images/jc.gif
-    - images/jd.gif
-    - images/jh.gif
-    - images/js.gif
-    - images/kc.gif
-    - images/kd.gif
-    - images/kh.gif
-    - images/ks.gif
-    - images/qc.gif
-    - images/qd.gif
-    - images/qh.gif
-    - images/qs.gif
-    - images/tc.gif
-    - images/td.gif
-    - images/th.gif
-    - images/ts.gif
+    - data/contacts.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.io/assets-and-images/#resolution-aware.

@@ -1,0 +1,11 @@
+Immutable unless stated otherwise
+
+Db
+MutableDb
+Contact
+Id
+Contacts (a list)
+
+Query
+    sort: Sort
+    filter: Filter
