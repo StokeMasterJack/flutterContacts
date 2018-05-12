@@ -7,6 +7,16 @@
       <excludeFolder url="file://$MODULE_DIR$/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
     </content>
+    <content url="file://$repos$/_FlutterProjects/ssutil">
+      <excludeFolder url="file://$repos$/_FlutterProjects/ssutil/.dart_tool" />
+      <excludeFolder url="file://$repos$/_FlutterProjects/ssutil/.pub" />
+      <excludeFolder url="file://$repos$/_FlutterProjects/ssutil/build" />
+    </content>
+    <content url="file://$repos$/_FlutterProjects/ssutil_flutter">
+      <excludeFolder url="file://$repos$/_FlutterProjects/ssutil_flutter/.dart_tool" />
+      <excludeFolder url="file://$repos$/_FlutterProjects/ssutil_flutter/.pub" />
+      <excludeFolder url="file://$repos$/_FlutterProjects/ssutil_flutter/build" />
+    </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Dart SDK" level="project" />
     <orderEntry type="library" name="Dart Packages" level="project" />

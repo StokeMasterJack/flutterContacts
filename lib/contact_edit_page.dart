@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:contacts/contacts.dart';
-import 'package:contacts/ui_common.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ssutil_flutter/ssutil_flutter.dart';
@@ -10,6 +9,17 @@ const itemPaddingText = EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 12.0);
 const itemPaddingOther = EdgeInsets.fromLTRB(12.0, 0.0, 12.0, 0.0);
 
 class ContactEditPage extends StatefulWidget {
+  final Contact initContact;
+  final Db db;
+
+  ContactEditPage({@required this.db, @required this.initContact})
+      : assert(db != null),
+        assert(initContact != null);
+
+  @override
+  State createState() => _ContactEditPageState();
+
+  static const String prefix = "/ContactEdit";
 
   static void navToContactEdit(BuildContext context, Id id) {
     Navigator.pushNamed(context, '/ContactEdit/$id');
@@ -17,22 +27,6 @@ class ContactEditPage extends StatefulWidget {
 
   static void navToContactNew(BuildContext context) {
     Navigator.pushNamed(context, '/ContactEdit/new');
-  }
-
-  final Contact initContact;
-  final ContactCallbacks callbacks;
-  final Db db;
-
-  ContactEditPage({@required this.db, @required this.callbacks, this.initContact})
-      : assert(db != null),
-        assert(callbacks != null),
-        assert(initContact != null);
-
-  static const String prefix = "/ContactEdit";
-
-  @override
-  State createState() {
-    return new _ContactEditPageState();
   }
 }
 
@@ -101,8 +95,10 @@ class _ContactEditPageState extends SsState<ContactEditPage> {
     );
   }
 
+  Db get db => widget.db;
+
   void _onSavePressed(BuildContext context) {
-    widget.callbacks.dbPut(context, _buildContact());
+    db.put(_buildContact());
     Navigator.pop(context);
   }
 

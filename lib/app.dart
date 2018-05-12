@@ -6,47 +6,27 @@ import 'package:contacts/ui_common.dart';
 import 'package:flutter/material.dart';
 import 'package:ssutil_flutter/ssutil_flutter.dart';
 
-const String materialApp = "MaterialApp";
-const String contactsApp = "ContactsApp";
-const String contactsPage = "ContactsPage";
-const String favoritesPage = "FavoritesPage";
-
-const Key materialAppKey = const ValueKey("${materialApp}Key");
-const Key contactsAppKey = const ValueKey("${contactsApp}Key");
-const Key contactsPageKey = const ValueKey<String>("${contactsPage}Key");
-const Key favoritesKey = const ValueKey<String>("${favoritesPage}Key");
+const Key materialAppKey = const ValueKey("MaterialAppKey");
+const Key contactsAppKey = const ValueKey("ContactsAppKey");
+const Key contactsPageKey = const ValueKey<String>("ContactsPageKey");
+const Key favoritesKey = const ValueKey<String>("FavoritesPageKey");
 
 class App extends SsStatefulWidget {
-  final MutableDb db = MutableDb();
+  final Db db = Db();
 
   @override
-  State createState() {
-    return new AppState();
-  }
+  createState() => new AppState();
 
   App() : super(key: contactsAppKey);
 }
 
-class AppState extends SsState<App> implements ContactCallbacks {
-  MutableDb get db => widget.db;
-
-  Key contactsKeyNonNullDb;
+class AppState extends SsState<App> {
+  Db get db => widget.db;
 
   @override
   void initState() {
     super.initState();
     db.populateFromJsonAsset();
-  }
-
-  void refresh() {
-    throw StateError("");
-//    print("App.refresh");
-//    setState(() {});
-  }
-
-//  static Key _appKey = new ObjectKey("App");
-  Key genNonNullDbKey(String prefix) {
-    return new ValueKey("${prefix}Db[${db.hashCode}]");
   }
 
   @override
@@ -55,51 +35,28 @@ class AppState extends SsState<App> implements ContactCallbacks {
     return new MaterialApp(key: materialAppKey, onGenerateRoute: buildRoute);
   }
 
-  @override
-  void dbDelete(BuildContext context, Id id) async {
-    db.delete(id);
-  }
-
-  @override
   void dbDeleteAll(BuildContext context, IdSet ids) {
     db.deleteAll(ids);
   }
 
-  @override
-  void dbPut(BuildContext context, Contact contact) {
-    db.put(contact);
-  }
-
-  @override
   void dbClear(BuildContext context) {
     db.clear();
   }
 
-  @override
   void dbSerialize(BuildContext context) {
     db.serializeToFile();
   }
 
-  @override
   void dbPopulateFromRandomUser(BuildContext context) {
     db.populateFromRandomUser(500);
   }
-
-//  Future<void> navToContactSelection(BuildContext context, Contacts contacts, Id initSelection) {
-//    Widget page = new ContactSelectionPage(contacts: contacts, initSelection: initSelection, callbacks: this);
-//    return navPush<void>(context, page, desc: "NavToContactSelection");
-//  }
-//
-//  Future<void> navToContactFilter(BuildContext context, Contacts contacts) {
-//    Widget page = new ContactFilterPage(db: db, callbacks: this, initContacts: contacts);
-//    return navPushNoAnimation<void>(context, page);
-//  }
 
   Route<dynamic> buildRoute(RouteSettings settings) {
     return _buildRoute(new Rt(settings));
   }
 
   static List<RtBuilderFactory> factories = [ContactEditRtBuilder(), FavoritesRtBuilder(), ContactsRtBuilder()];
+
 
   Route<dynamic> _buildRoute(Rt rt) {
     for (RtBuilderFactory f in factories) {
@@ -115,6 +72,7 @@ class AppState extends SsState<App> implements ContactCallbacks {
       Choice(title: 'populateDbFromRandomUser', icon: Icons.directions_bike, action: dbPopulateFromRandomUser),
       Choice(title: 'serializeDbToJson', icon: Icons.directions_boat, action: dbSerialize),
     ];
+
   }
 
   PopupMenuButton<Choice> buildPopupMenuButton(BuildContext context) {
@@ -148,7 +106,6 @@ class ContactEditRtBuilder extends RtBuilderFactory<AppState> {
 
   @override
   Widget buildPage(BuildContext context, Rt rt, AppState app) {
-//    rt.dump();
     Id id;
     if (rt.isLastSegmentAnIntId) {
       id = rt.parseId();
@@ -156,7 +113,7 @@ class ContactEditRtBuilder extends RtBuilderFactory<AppState> {
       id = null;
     }
     Contact c = app.db.initContact(id);
-    return ContactEditPage(db: app.db, callbacks: app, initContact: c);
+    return ContactEditPage(db: app.db, initContact: c);
   }
 }
 

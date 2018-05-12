@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:contacts/contact_list_view.dart';
 import 'package:contacts/contacts.dart';
+import 'package:contacts/fav_grid_view.dart';
 import 'package:contacts/ui_common.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,6 @@ class ContactsPage extends SsStatefulWidget {
   final Db db;
   final Listenable dbListenable;
 
-//  final DbQuery<int> getCount;
   final MenuBuilder menuBuilder;
   final ContextCallback navToContactNew;
   final ContextAction<Id> navToContactEdit;
@@ -32,72 +32,61 @@ class ContactsPage extends SsStatefulWidget {
   }) : super(key: key);
 
   @override
-  State createState() {
-    return new ContactsPageState();
-  }
-
-  List<Tab> createTabs() {
-    return [createAllTab(), createActiveTab()];
-  }
-
-  Tab createAllTab() {
-    return createTab(TabId.all, 0, Icons.favorite, "All");
-  }
-
-  Tab createTab(TabId tabId, int index, IconData iconData, String title) {
-    return Tab(tabId: tabId, index: index, iconData: iconData, title: title);
-  }
-
-  Tab createActiveTab() {
-    return createTab(TabId.active, 1, Icons.favorite, "Active");
-  }
+  createState() => ContactsPageState();
 }
 
-class Tab {
-  final TabId tabId;
+enum TabKey { fav, active, inactive }
+
+class TabInfo {
   final int index;
-  final IconData iconData;
+  final TabKey key;
   final String title;
+  final IconData iconData;
+  final Tab tab;
 
-  Tab({this.tabId, this.index, this.iconData, this.title});
+  TabInfo({this.index, this.key, this.title, this.iconData, this.tab});
 
-  BottomNavigationBarItem buildBottomNavigationBarItem(BuildContext context) {
-    return new BottomNavigationBarItem(
-      icon: new Icon(iconData),
-      title: Text(title.toUpperCase()),
+  Tab buildTab(BuildContext context) {
+    return Tab(
+      key: ValueKey(key.toString()),
+//      icon: new Icon(iconData),
+      text: title,
     );
   }
 }
 
-class ContactsPageState extends SsState<ContactsPage> {
+class ContactsPageState extends SsState<ContactsPage> with SingleTickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>(debugLabel: "ContactsPageKey");
 
   bool _isSearchMode = false;
 
   MutableIdSet _selected = MutableIdSet();
 
-  List<Tab> tabs;
-  Tab currentTab;
-
   Contacts contacts = Contacts.empty;
 
-  final TextEditingController controller = new TextEditingController();
+  final TextEditingController _searchController = new TextEditingController();
+  TabController _tabController;
+
+  final _tabInfos = <TabInfo>[
+    TabInfo(index: 0, key: TabKey.fav, title: "Favorites", iconData: Icons.star),
+    TabInfo(index: 1, key: TabKey.active, title: "Active", iconData: Icons.people),
+    TabInfo(index: 2, key: TabKey.inactive, title: "Inactive", iconData: Icons.history)
+  ];
 
   Listenable listenable;
 
   @override
   void initState() {
     super.initState();
-    tabs = widget.createTabs();
-    setCurrentTab(0);
 
-    listenable = new Listenable.merge(<Listenable>[widget.dbListenable, controller]);
+    _tabController = new TabController(vsync: this, length: _tabInfos.length);
+
+    Listenable listenable = new Listenable.merge([db, _searchController, _tabController]);
 
     listenable.addListener(this.myListener);
   }
 
   void myListener() {
-    print("change event");
     setState(() {});
   }
 
@@ -110,21 +99,40 @@ class ContactsPageState extends SsState<ContactsPage> {
         key: _scaffoldKey,
         floatingActionButton: buildActionButton(context),
         appBar: _buildAppBar(context),
-        bottomNavigationBar: _buildBottomNavBar(),
-        body: buildBody(context));
+        body: new TabBarView(
+          controller: _tabController,
+          children: [
+            buildFavViewGrid(context, computeContactsFavTab()),
+            buildContentListView(context, computeContactsActiveTab()),
+            buildContentListView(context, computeContactsInactiveTab()),
+          ],
+        ));
   }
 
-  Widget buildDataView(BuildContext context, Contacts contacts) {
+  Widget _buildAppBar(BuildContext context) {
+    if (_isSelectionMode) {
+      return _buildSelectionAppBar(context);
+    } else if (_isSearchMode) {
+      return _buildSearchAppBar(context);
+    } else {
+      return buildMainAppBar(context);
+    }
+  }
+
+  Widget buildContentListView(BuildContext context, Contacts contacts) {
     return new ContactListView(
         contacts: contacts,
-        selected: this._selected.immutable(),
+        selected: _selected.immutable(),
         onContactTap: onContactTap,
         onContactLongPress: onContactLongPress);
   }
 
-  Widget buildBody(BuildContext context) {
-    Contacts contacts = computeCurrentContacts();
-    return buildDataView(context, contacts);
+  Widget buildFavViewGrid(BuildContext context, Contacts contacts) {
+    return new FavGridView(
+        contacts: contacts,
+        selected: _selected.immutable(),
+        onContactTap: onContactTap,
+        onContactLongPress: onContactLongPress);
   }
 
   void onContactTap(BuildContext context, Contact contact) {
@@ -139,11 +147,11 @@ class ContactsPageState extends SsState<ContactsPage> {
 
   void onContactLongPress(BuildContext context, Contact contact) {
     if (!_isSelectionMode) {
-      onBeginSelectionMode(context, contact.id);
+      onSelectionModeBegin(context, contact.id);
     }
   }
 
-  void onBeginSelectionMode(BuildContext context, Id firstId) {
+  void onSelectionModeBegin(BuildContext context, Id firstId) {
     ModalRoute.of(context).addLocalHistoryEntry(new LocalHistoryEntry(
       onRemove: () {
         setState(() {
@@ -164,12 +172,12 @@ class ContactsPageState extends SsState<ContactsPage> {
     listenable.removeListener(this.myListener);
   }
 
-  void onBeginSearchMode(BuildContext context) {
+  void onSearchModeBegin(BuildContext context) {
     ModalRoute.of(context).addLocalHistoryEntry(new LocalHistoryEntry(
       onRemove: () {
         setState(() {
           _isSearchMode = false;
-          controller.clear();
+          _searchController.clear();
         });
       },
     ));
@@ -178,118 +186,46 @@ class ContactsPageState extends SsState<ContactsPage> {
     });
   }
 
-  void onSearchModeEnd(BuildContext context) {
-    setState(() {
-      _isSearchMode = false;
-    });
+  String get currentQuery {
+    return _searchController.text;
   }
 
-  void setCurrentTab(int index) {
-    setState(() {
-      currentTab = tabs[index];
-    });
+  bool searchFilter(Contact c) {
+    String q = currentQuery;
+    return Filters.createSearchStringFilter(q)(c);
   }
 
-  List<BottomNavigationBarItem> buildBottomItems() {
-    List<BottomNavigationBarItem> a = [];
-    for (Tab tab in tabs) {
-      a.add(new BottomNavigationBarItem(
-        backgroundColor: Colors.yellow,
-        icon: new Icon(tab.iconData),
-        title: Text(tab.title.toUpperCase()),
-      ));
-    }
-    return a;
+  bool currentFilterFavTab(Contact c) {
+    Filter f1 = Filters.favFilter;
+    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
+    return f1(c) && f2(c);
   }
 
-  BottomNavigationBar _buildBottomNavBar() {
-    return new BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      onTap: setCurrentTab,
-      items: buildBottomItems(),
-      currentIndex: currentTab.index,
-    );
+  bool currentFilterActiveTab(Contact c) {
+    Filter f1 = Filters.activeFilter;
+    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
+    return f1(c) && f2(c);
   }
 
-  String buildPageTitle() {
-    int length = computeCurrentLength();
-    String title = currentTab.title;
-    return "$title Contacts [$length]";
+  bool currentFilterInactiveTab(Contact c) {
+    Filter f1 = Filters.inactiveFilter;
+    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
+    return f1(c) && f2(c);
   }
 
-  Widget _buildSearchAppBar(BuildContext context) {
-    return new AppBar(
-      title: new TextField(
-        //        autofocus: true,
-        controller: controller,
-        decoration: new InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: "Find contacts",
-            isDense: true,
-            suffixIcon: (controller.text == null || controller.text.isEmpty)
-                ? null
-                : new IconButton(
-                    icon: const Icon(Icons.cancel),
-                    onPressed: () {
-                      setState(() {
-                        controller.clear();
-                      });
-                    })),
-      ),
-    );
+  Contacts computeContactsFavTab() {
+    List<Contact> list = db.selectDefaultSort(currentFilterFavTab);
+    return new Contacts(list);
   }
 
-  Widget _buildAppBar(BuildContext context) {
-    if (_isSelectionMode) {
-      return _buildSelectionAppBar(context);
-    } else if (_isSearchMode) {
-      return _buildSearchAppBar(context);
-    } else {
-      return _buildMainAppBar(context);
-    }
+  Contacts computeContactsActiveTab() {
+    List<Contact> list = db.selectDefaultSort(currentFilterActiveTab);
+    return new Contacts(list);
   }
 
-  Widget _buildSelectionAppBar(BuildContext context) {
-    return new AppBar(
-        //      backgroundColor: Theme.of(context).canvasColor,
-        leading: new IconButton(
-            icon: const Icon(Icons.cancel),
-            onPressed: () {
-              setState(() {
-                Navigator.pop(context);
-              });
-            }),
-        title: new Text(_selected.length.toString()),
-        actions: <Widget>[
-          new IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: () async {
-              bool confirmed = await _showDeleteDialog(context);
-              if (confirmed) {
-                widget.onDeleteAll(context, IdSet(_selected));
-                postDeleteSnack();
-                Navigator.pop(context);
-              }
-            },
-          )
-        ]);
-  }
-
-  Widget _buildMainAppBar(BuildContext context) {
-    String title = buildPageTitle();
-    return new AppBar(
-      title: Text(title),
-      actions: <Widget>[
-        new IconButton(icon: Icon(Icons.search), onPressed: () => onBeginSearchMode(context)),
-        new IconButton(icon: Icon(Icons.favorite), onPressed: () => onPressedNavToFavorites(context)),
-        widget.menuBuilder(context)
-      ],
-    );
-  }
-
-  void onPressedNavToFavorites(BuildContext context) {
-    widget.navToFavorites(context);
+  Contacts computeContactsInactiveTab() {
+    List<Contact> list = db.selectDefaultSort(currentFilterInactiveTab);
+    return new Contacts(list);
   }
 
   Widget buildActionButton(BuildContext context) {
@@ -302,8 +238,102 @@ class ContactsPageState extends SsState<ContactsPage> {
         child: const Icon(Icons.add));
   }
 
-  bool get _isActiveMode {
-    return currentTab.tabId == TabId.active;
+  Filter computeCurrentFilter(int currentTabIndex) {
+    switch (currentTabIndex) {
+      case 0:
+        return currentFilterFavTab;
+      case 1:
+        return currentFilterActiveTab;
+      case 2:
+        return currentFilterInactiveTab;
+      default:
+        throw new StateError("");
+    }
+  }
+
+  int computeCurrentLength() {
+    Filter currentFilter = computeCurrentFilter(currentTabIndex);
+    return db.count(currentFilter);
+  }
+
+  String buildPageTitle() {
+    int length = computeCurrentLength();
+    String title = tabInfo.title;
+    return "$title [$length]";
+  }
+
+  Widget _buildSearchAppBar(BuildContext context) {
+    return new AppBar(
+      title: new TextField(
+        //        autofocus: true,
+        controller: _searchController,
+        decoration: new InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            hintText: "Find contacts",
+            isDense: true,
+            suffixIcon: (_searchController.text == null || _searchController.text.isEmpty)
+                ? null
+                : new IconButton(
+                    icon: const Icon(Icons.cancel),
+                    onPressed: () {
+                      setState(() {
+                        _searchController.clear();
+                      });
+                    })),
+      ),
+      bottom: buildTabBar(context),
+    );
+  }
+
+  void onPressedNavToFavorites(BuildContext context) {
+    widget.navToFavorites(context);
+  }
+
+  Widget _buildSelectionAppBar(BuildContext context) {
+    return new AppBar(
+      //      backgroundColor: Theme.of(context).canvasColor,
+      leading: new IconButton(
+          icon: const Icon(Icons.cancel),
+          onPressed: () {
+            setState(() {
+              Navigator.pop(context);
+            });
+          }),
+      title: new Text(_selected.length.toString()),
+      actions: <Widget>[
+        new IconButton(
+          icon: Icon(Icons.delete),
+          onPressed: () async {
+            bool confirmed = await _showDeleteDialog(context);
+            if (confirmed) {
+              widget.onDeleteAll(context, IdSet(_selected));
+              postDeleteSnack();
+              Navigator.pop(context);
+            }
+          },
+        )
+      ],
+      bottom: buildTabBar(context),
+    );
+  }
+
+  Widget buildMainAppBar(BuildContext context) {
+    String title = buildPageTitle();
+    return AppBar(
+        title: Text(title),
+        actions: <Widget>[
+          new IconButton(icon: Icon(Icons.search), onPressed: () => onSearchModeBegin(context)),
+          new IconButton(icon: Icon(Icons.favorite), onPressed: () => onPressedNavToFavorites(context)),
+          widget.menuBuilder(context)
+        ],
+        bottom: buildTabBar(context));
+  }
+
+  TabBar buildTabBar(BuildContext context) {
+    Tab f(TabInfo ti) => ti.buildTab(context);
+    List<Tab> tabs = _tabInfos.map(f).toList();
+    return TabBar(controller: _tabController, tabs: tabs);
   }
 
   Future<bool> _showDeleteDialog(BuildContext context) async {
@@ -311,38 +341,9 @@ class ContactsPageState extends SsState<ContactsPage> {
         context: context, content: 'Delete ${_selected.length} selected records?', okText: "Delete");
   }
 
-  String get currentQuery {
-    return controller.text;
-  }
+  int get currentTabIndex => _tabController.index;
 
-  bool searchFilter(Contact c) {
-    String q = currentQuery;
-    return Filters.createSearchStringFilter(q)(c);
-  }
-
-  bool currentFilter(Contact c) {
-    Filter f1 = _isActiveMode ? Filters.activeFilter : Filters.trueFilter;
-    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
-    return f1(c) && f2(c);
-  }
-
-  Contacts computeCurrentContacts() {
-    List<Contact> list = db.selectDefaultSort(currentFilter);
-    return new Contacts(list);
-  }
-
-  int computeCurrentLength() {
-    return db.count(currentFilter);
-  }
-
-  void dumpCurrentFilterInfo() {
-    Filter f = currentFilter;
-    print("currentFilter[$f]");
-    print("  isActiveMode[$_isActiveMode");
-    print("  isSearchMode[$_isSearchMode");
-    print("  isSelectionMode[$_isSelectionMode");
-    print("  currentQuery[$currentQuery]");
-  }
+  TabInfo get tabInfo => _tabInfos[currentTabIndex];
 
   void postDeleteSnack() {
     _scaffoldKey.currentState.showSnackBar(new SnackBar(

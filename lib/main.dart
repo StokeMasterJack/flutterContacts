@@ -1,8 +1,9 @@
 import 'package:contacts/app.dart';
 import 'package:flutter/material.dart';
+import 'package:ssutil_flutter/ssutil_flutter.dart';
 
 void main() {
-//  SsGlobals.debugLogging = false;
+  SsGlobals.debugLogging = false;
   runApp(new App());
 }
 

@@ -6,20 +6,8 @@ import 'package:ssutil_flutter/ssutil_flutter.dart';
 typedef ContactCallback(BuildContext context, Contact contact);
 typedef PopupMenuButton<Choice> MenuBuilder(BuildContext context);
 
-abstract class ContactCallbacks {
-  //db
-  void dbDelete(BuildContext context, Id id);
-
-  void dbDeleteAll(BuildContext context, IdSet ids);
-
-  void dbPut(BuildContext context, Contact contact);
-
-  void dbClear(BuildContext context);
-
-  void dbSerialize(BuildContext context);
-
-  void dbPopulateFromRandomUser(BuildContext context);
-}
+typedef bool RtPredicate(Rt rt);
+typedef Route RtBuilder(Rt rt);
 
 class Rt {
   static const String newSuffix = "/new";
@@ -84,9 +72,6 @@ class Rt {
     }
   }
 }
-
-typedef bool RtPredicate(Rt rt);
-typedef Route RtBuilder(Rt rt);
 
 class RtBuilderFactory<T> {
   String prefix = "PREFIX";

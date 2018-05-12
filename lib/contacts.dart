@@ -50,7 +50,7 @@ class Contacts extends UnmodifiableListView<Contact> {
         a.add(contact);
       }
     } else {
-      ss.stateErr();
+      ss.throwStateErr();
     }
     return a;
   }
@@ -121,8 +121,6 @@ class IdSet extends UnmodifiableSetView<Id> {
     return _empty1;
   }
 }
-
-enum TabId { active, all }
 
 class MutableIdSet extends DelegatingSet<Id> {
   MutableIdSet() : super(new Set<Id>());
@@ -242,31 +240,15 @@ class Contact {
 
   String get avatarChar => ss.avatarChar(fullName);
 
-  matches(String query, TabId tab) {}
+//  matches(String query, TabKey tab) {
+//
+//  }
 
   bool matchesSearchFilter(String query) {
     assert(query != null);
     String q = query.trim().toUpperCase();
     if (q == "") return true;
     return fullName.toUpperCase().contains(q);
-  }
-
-  bool matchesTabFilter(TabId tab) {
-    assert(tab != null);
-    switch (tab) {
-      case TabId.all:
-        return true;
-      case TabId.active:
-        return this.active;
-      default:
-        throw Error();
-    }
-  }
-
-  bool matchesSearchAndTab(TabId tab, String query) {
-    assert(query != null);
-    assert(tab != null);
-    return matchesSearchFilter(query) && matchesTabFilter(tab);
   }
 }
 
@@ -316,10 +298,6 @@ class Sort {
 
   const Sort({this.field = Field.fullName, this.asc = true});
 
-//  void sort1(List<Contact> contacts) {
-//    contacts.sort((a, b) => a.fullName.compareTo(b.fullName));
-//  }
-
   void sort(MutableContacts contacts) {
     field.sort(contacts, asc);
   }
@@ -335,6 +313,7 @@ typedef bool Filter(Contact contact);
 
 class Filters {
   static bool activeFilter(Contact c) => c.active;
+  static bool inactiveFilter(Contact c) => !c.active;
 
   static bool trueFilter(Contact c) => true;
 
@@ -362,38 +341,7 @@ class DbQuery {
   Filter get filter => _filter;
 }
 
-abstract class Db {
-  Iterable<Contact> get iterable;
-
-  Sort get defaultSort;
-
-  Contact getById(Id id);
-
-  MutableContacts filter(Filter filter);
-
-  Contacts select(DbQuery q);
-
-  Contacts selectDefaultSort(Filter filter);
-
-  int count(Filter filter);
-
-  int favCount();
-
-  Contacts favorites();
-
-  static int safeHash(Db db) {
-    return identityHashCode(db);
-  }
-
-  static String safeToString(Db db) {
-    if (db == null)
-      return "DbNull[${safeHash(db)}]";
-    else
-      return "DbNonNull[${safeHash(db)}]";
-  }
-}
-
-class MutableDb extends ChangeNotifier implements Db {
+class Db extends ChangeNotifier {
   static const defaultLocalFileName = "contacts.json";
   static const defaultLocalAssetName = "data/contacts.json";
 
@@ -403,10 +351,8 @@ class MutableDb extends ChangeNotifier implements Db {
     return new Contact.blank();
   }
 
-  @override
   Sort defaultSort = Sort.fullNameAsc;
 
-  @override
   MutableContacts filter(Filter filter) {
     MutableContacts results = MutableContacts([]);
     for (Contact contact in iterable) {
@@ -418,7 +364,6 @@ class MutableDb extends ChangeNotifier implements Db {
     return results;
   }
 
-  @override
   Contacts select(DbQuery q) {
     MutableContacts a = filter(q.filter);
     q.sort(a);
@@ -429,7 +374,6 @@ class MutableDb extends ChangeNotifier implements Db {
     return select(DbQuery(filter, defaultSort));
   }
 
-  @override
   int count(Filter filter) {
     int cnt = 0;
     for (Contact c in iterable) {
@@ -440,17 +384,14 @@ class MutableDb extends ChangeNotifier implements Db {
     return cnt;
   }
 
-  @override
   int favCount() {
     return count(Filters.favFilter);
   }
 
-  @override
   Contacts favorites() {
     return select(DbQuery.fav);
   }
 
-  @override
   String toString() {
     return Db.safeToString(this);
   }
@@ -467,7 +408,6 @@ class MutableDb extends ChangeNotifier implements Db {
     map.clear();
   }
 
-  @override
   Contact getById(Id id) {
     return map[id];
   }
@@ -487,7 +427,7 @@ class MutableDb extends ChangeNotifier implements Db {
     } else if (jsonSomething is List) {
       putJsonList(jsonSomething);
     } else {
-      ss.stateErr();
+      ss.throwStateErr();
     }
   }
 
@@ -528,10 +468,8 @@ class MutableDb extends ChangeNotifier implements Db {
       return getById(idOrNull);
   }
 
-  @override
   int get hashCode => identityHashCode(this);
 
-  @override
   bool operator ==(other) {
     return identical(this, other);
   }
@@ -581,5 +519,16 @@ class MutableDb extends ChangeNotifier implements Db {
     File file = new File('$dirPath/$localName');
     print("writing text file to file[$file]");
     return file.writeAsString(data);
+  }
+
+  static int safeHash(Db db) {
+    return identityHashCode(db);
+  }
+
+  static String safeToString(Db db) {
+    if (db == null)
+      return "DbNull[${safeHash(db)}]";
+    else
+      return "DbNonNull[${safeHash(db)}]";
   }
 }
