@@ -39,47 +39,68 @@ class Contacts extends UnmodifiableListView<Contact> {
 
   static Contacts get empty => _empty;
 
-  static List<Contact> fromJsonSync(dynamic jsonData) {
-    List<Contact> a = <Contact>[];
+  static Map<Id, Contact> fromJsonSync(dynamic jsonData) {
+    Map<Id, Contact> map = <Id, Contact>{};
     if (jsonData is Map) {
       Contact contact = Contact.fromJson(jsonData);
-      a.add(contact);
+      map[contact.id] = contact;
     } else if (jsonData is List) {
       for (Map<String, dynamic> jsonMap in jsonData) {
         Contact contact = Contact.fromJson(jsonMap);
-        a.add(contact);
+        map[contact.id] = contact;
       }
     } else {
       ss.throwStateErr();
     }
-    return a;
+    return map;
   }
 
-  static List<Contact> fromJsonTextSync(String jsonText) {
-    dynamic jsonData = json.decode(jsonText);
-    return fromJsonSync(jsonData);
+  static Map<Id, Contact> fromJsonTextSync(String jsonText) {
+    try {
+      dynamic jsonData = json.decode(jsonText);
+      return fromJsonSync(jsonData);
+    } catch (e, st) {
+      debugPrint("Error parsing json");
+      debugPrint("  $e");
+      debugPrint("  $st");
+      return {};
+    }
   }
 
-  static Future<List<Contact>> fromJsonText(String jsonText) {
+  static Future<Map<Id, Contact>> fromJsonText(String jsonText) {
     return compute(fromJsonTextSync, jsonText);
   }
 
-  static List<Map<String, dynamic>> toJsonSync(List<Contact> contacts) {
+  static List<Map<String, dynamic>> toJsonSync(Map<Id, Contact> map) {
     List<Map<String, dynamic>> a = <Map<String, dynamic>>[];
-    for (Contact contact in contacts) {
+    for (Contact contact in map.values) {
       a.add(contact.toJson());
     }
     return a;
   }
 
-  static String toJsonTextSync(List<Contact> contacts) {
-    List<Map<String, dynamic>> jsonData = toJsonSync(contacts);
+  static String toJsonTextSync(Map<Id, Contact> map) {
+    List<Map<String, dynamic>> jsonData = toJsonSync(map);
     return json.encode(jsonData);
   }
 
-  static Future<String> toJsonText(List<Contact> contacts) {
-    return compute(toJsonTextSync, contacts);
+  static Future<String> toJsonText(Map<Id, Contact> map) {
+    return compute(toJsonTextSync, map);
   }
+
+  Contacts filter(Filter filter) {
+    return Contacts(where((Contact c) => filter(c)).toList());
+  }
+
+  Contacts byKey(TabKey tabKey) {
+    return filter(Filters.map[tabKey]);
+  }
+
+  Contacts favorites() => filter(Filters.favFilter);
+
+  Contacts actives() => filter(Filters.activeFilter);
+
+  Contacts all() => this;
 }
 
 class Id {
@@ -168,20 +189,49 @@ class Contact {
   final bool active;
   final bool favorite;
   final String nat;
+  final String largeImg;
+  final String mediumImg;
   final String thumbnail;
 
-  const Contact(
-      {@required this.id,
-      this.firstName,
-      this.lastName,
-      this.level = Level.Beginner,
-      this.color = Col.Red,
-      this.active = false,
-      this.favorite = false,
-      this.nat = "US",
-      this.thumbnail});
+  const Contact({
+    @required this.id,
+    this.firstName,
+    this.lastName,
+    this.level = Level.Beginner,
+    this.color = Col.Red,
+    this.active = false,
+    this.favorite = false,
+    this.nat = "US",
+    this.largeImg,
+    this.mediumImg,
+    this.thumbnail,
+  });
 
-  Contact.blank() : this(id: Id.gen());
+  static Contact copy(Contact c, {bool isNullNormalize = false}) {
+    String n(String s) => isNullNormalize ? ss.nullNormalize(s) : s;
+    return Contact(
+        id: c.id,
+        firstName: n(c.firstName),
+        lastName: n(c.lastName),
+        level: c.level,
+        color: c.color,
+        active: c.active,
+        favorite: c.favorite,
+        nat: n(c.nat),
+        largeImg: n(c.largeImg),
+        mediumImg: n(c.mediumImg),
+        thumbnail: n(c.thumbnail));
+  }
+
+  Contact nullNormalize() {
+    return copy(this, isNullNormalize: true);
+  }
+
+  String get bestImage {
+    return largeImg ?? mediumImg ?? thumbnail;
+  }
+
+  Contact.empty() : this(id: Id.gen());
 
   String get fullName => "$firstName $lastName";
 
@@ -192,16 +242,38 @@ class Contact {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Contact && runtimeType == other.runtimeType && id == other.id;
+      identical(this, other) ||
+      other is Contact &&
+          runtimeType == other.runtimeType &&
+          firstName == other.firstName &&
+          lastName == other.lastName &&
+          color == other.color &&
+          level == other.level &&
+          active == other.active &&
+          favorite == other.favorite &&
+          nat == other.nat &&
+          largeImg == other.largeImg &&
+          mediumImg == other.mediumImg &&
+          thumbnail == other.thumbnail;
 
   @override
-  int get hashCode => id != null ? id.hashCode : 0;
+  int get hashCode =>
+      firstName.hashCode ^
+      lastName.hashCode ^
+      color.hashCode ^
+      level.hashCode ^
+      active.hashCode ^
+      favorite.hashCode ^
+      nat.hashCode ^
+      largeImg.hashCode ^
+      mediumImg.hashCode ^
+      thumbnail.hashCode;
 
   Map<String, dynamic> toJson() {
     assert(nat == null || nat is String);
     assert(color != null && color is Col);
     return {
-      'id': id,
+      'id': id.value,
       'firstName': firstName,
       'lastName': lastName,
       'color': describeEnum(color),
@@ -209,6 +281,8 @@ class Contact {
       'active': active,
       'favorite': favorite,
       'nat': nat,
+      'largeImg': largeImg,
+      'mediumImg': mediumImg,
       'thumbnail': thumbnail,
     };
   }
@@ -229,6 +303,8 @@ class Contact {
       active: map["active"],
       favorite: map["favorite"],
       nat: map["nat"],
+      largeImg: map["largeImg"],
+      mediumImg: map["mediumImg"],
       thumbnail: map["thumbnail"],
     );
   }
@@ -249,6 +325,10 @@ class Contact {
     String q = query.trim().toUpperCase();
     if (q == "") return true;
     return fullName.toUpperCase().contains(q);
+  }
+
+  void validate() {
+    assert(id != null);
   }
 }
 
@@ -311,8 +391,13 @@ class Sort {
 
 typedef bool Filter(Contact contact);
 
+enum TabKey { favorites, active, all }
+
 class Filters {
+  static Map<TabKey, Filter> map = {TabKey.favorites: favFilter, TabKey.active: activeFilter, TabKey.all: trueFilter};
+
   static bool activeFilter(Contact c) => c.active;
+
   static bool inactiveFilter(Contact c) => !c.active;
 
   static bool trueFilter(Contact c) => true;
@@ -347,10 +432,6 @@ class Db extends ChangeNotifier {
 
   final Map<Id, Contact> map = <Id, Contact>{};
 
-  Contact init() {
-    return new Contact.blank();
-  }
-
   Sort defaultSort = Sort.fullNameAsc;
 
   MutableContacts filter(Filter filter) {
@@ -364,141 +445,118 @@ class Db extends ChangeNotifier {
     return results;
   }
 
-  Contacts select(DbQuery q) {
+  Contacts executeQuery(DbQuery q) {
     MutableContacts a = filter(q.filter);
     q.sort(a);
     return a.immutable();
   }
 
-  Contacts selectDefaultSort(Filter filter) {
-    return select(DbQuery(filter, defaultSort));
-  }
-
-  int count(Filter filter) {
-    int cnt = 0;
-    for (Contact c in iterable) {
-      if (filter(c)) {
-        cnt++;
-      }
-    }
-    return cnt;
-  }
-
-  int favCount() {
-    return count(Filters.favFilter);
-  }
-
-  Contacts favorites() {
-    return select(DbQuery.fav);
-  }
-
-  String toString() {
-    return Db.safeToString(this);
+  Contacts select(Filter filter) {
+    return executeQuery(DbQuery(filter, defaultSort));
   }
 
   void delete(Id id) {
     map.remove(id);
+    notifyListeners();
   }
 
   void deleteAll(IdSet ids) {
     map.removeWhere((Id id, _) => ids.contains(id));
+    notifyListeners();
   }
 
-  void clear() {
+  void clearDb() {
     map.clear();
+    notifyListeners();
   }
 
+  //null if bad id
   Contact getById(Id id) {
     return map[id];
   }
 
   void put(Contact contact) {
+    contact.validate();
     map[contact.id] = contact;
+    notifyListeners();
   }
 
-  void putJsonText(String jsonText) {
-    dynamic jsonSomething = json.decode(jsonText);
-    putJson(jsonSomething);
-  }
+//  void putJsonText(String jsonText) {
+//    dynamic jsonSomething = json.decode(jsonText);
+//    putJson(jsonSomething);
+//  }
 
-  void putJson(dynamic jsonSomething) {
-    if (jsonSomething is Map) {
-      putJsonObject(jsonSomething);
-    } else if (jsonSomething is List) {
-      putJsonList(jsonSomething);
-    } else {
-      ss.throwStateErr();
-    }
-  }
-
-  void putJsonObject(Map<String, dynamic> jsonObject) {
-    Contact contact = Contact.fromJson(jsonObject);
-    put(contact);
-  }
-
-  void putJsonList(List<Map<String, dynamic>> jsonContacts) {
-    for (Map<String, dynamic> m in jsonContacts) {
-      putJsonObject(m);
-    }
-  }
-
-  void putContact(Map<String, dynamic> jsonContact) {
-    Contact contact = Contact.fromJson(jsonContact);
-    put(contact);
-  }
+//  void putJson(dynamic jsonSomething) {
+//    if (jsonSomething is Map) {
+//      putJsonObject(jsonSomething);
+//    } else if (jsonSomething is List) {
+//      putJsonList(jsonSomething);
+//    } else {
+//      ss.throwStateErr();
+//    }
+//  }
+//
+//  void putJsonObject(Map<String, dynamic> jsonObject) {
+//    Contact contact = Contact.fromJson(jsonObject);
+//    put(contact);
+//  }
+//
+//  void putJsonList(List<Map<String, dynamic>> jsonContacts) {
+//    for (Map<String, dynamic> m in jsonContacts) {
+//      putJsonObject(m);
+//    }
+//  }
+//
+//  void putContact(Map<String, dynamic> jsonContact) {
+//    Contact contact = Contact.fromJson(jsonContact);
+//    put(contact);
+//  }
 
   void putAll(Iterable<Contact> contacts) {
     for (Contact contact in contacts) {
       map[contact.id] = contact;
     }
+    notifyListeners();
   }
 
   Iterable<Contact> get iterable {
     return map.values;
   }
 
-  Future<void> populateFromRandomUser(int n) async {
-    await fetchSampleDataFromRandomUser(n);
+  Future<void> importRecordsFromRandomUser() async {
+    return importNRecordsFromRandomUser(500);
   }
 
-  Contact initContact(Id idOrNull) {
-    if (idOrNull == null)
-      return init();
-    else
-      return getById(idOrNull);
-  }
-
-  int get hashCode => identityHashCode(this);
-
-  bool operator ==(other) {
-    return identical(this, other);
-  }
-
-  Future<void> populateFromJsonAsset() async {
-    String jsonText = await loadJsonAsset();
-    List<Contact> contacts = await Contacts.fromJsonText(jsonText);
-    putAll(contacts);
+  Future<void> importNRecordsFromRandomUser(int n) async {
+    Contacts contacts = await fetchSampleDataFromRandomUser3(n);
+    int size1 = map.length;
+    this.putAll(contacts);
+    int size2 = map.length;
+    assert(size2 > size1);
     notifyListeners();
   }
 
-  Future<File> serializeToFile() async {
-    List<Contact> list = toList();
-    String jsonText = await Contacts.toJsonText(list);
-    return writeTextFileToLocalDocDir(defaultLocalFileName, jsonText);
+  Future<bool> importFromJsonAsset() async {
+    String jsonText = await loadJsonAsset();
+    Map<Id, Contact> map = await Contacts.fromJsonText(jsonText);
+    this.map.addAll(map);
+    notifyListeners();
+    return true;
   }
 
-  List<Map<String, dynamic>> toJsonSync() {
-    List<Map<String, dynamic>> a = <Map<String, dynamic>>[];
-    for (Contact c in iterable) {
-      Map<String, dynamic> jsonMap = c.toJson();
-      a.add(jsonMap);
-    }
-    return a;
+  Future<File> serializeToDocDir() async {
+    String jsonText = await Contacts.toJsonText(map);
+    return await writeTextToDocDir(defaultLocalFileName, jsonText);
   }
 
-  String toJsonTextSync() {
-    List<Map<String, dynamic>> a = toJsonSync();
-    return json.encode(a);
+  Future<File> serializeToExtDir() async {
+    String jsonText = await Contacts.toJsonText(map);
+    return await writeTextToExtDir(defaultLocalFileName, jsonText);
+  }
+
+  Future<File> serializeToTmpDir() async {
+    String jsonText = await Contacts.toJsonText(map);
+    return await writeTextToTmpDir(defaultLocalFileName, jsonText);
   }
 
   List<Contact> toList() {
@@ -513,12 +571,40 @@ class Db extends ChangeNotifier {
     return rootBundle.loadString(defaultLocalAssetName);
   }
 
-  static Future<File> writeTextFileToLocalDocDir(String localName, String data) async {
-    final directory = await getApplicationDocumentsDirectory();
-    String dirPath = directory.path;
+  Future<Directory> docDir() async {
+    return getApplicationDocumentsDirectory();
+  }
+
+  Future<Directory> tmpDir() async {
+    return getTemporaryDirectory();
+  }
+
+  Future<Directory> extDir() async {
+    return getExternalStorageDirectory();
+  }
+
+  static Future<File> writeTextToDocDir(String localName, String data) async {
+    final dir = await getApplicationDocumentsDirectory();
+    String dirPath = dir.path;
     File file = new File('$dirPath/$localName');
-    print("writing text file to file[$file]");
-    return file.writeAsString(data);
+    print("docDir: $file");
+    return await file.writeAsString(data);
+  }
+
+  static Future<File> writeTextToTmpDir(String localName, String data) async {
+    final dir = await getTemporaryDirectory();
+    String dirPath = dir.path;
+    File file = new File('$dirPath/$localName');
+    print("tmpDir: $file");
+    return await file.writeAsString(data);
+  }
+
+  static Future<File> writeTextToExtDir(String localName, String data) async {
+    final dir = await getExternalStorageDirectory();
+    String dirPath = dir.path;
+    File file = new File('$dirPath/$localName');
+    print("extDir: $file");
+    return await file.writeAsString(data);
   }
 
   static int safeHash(Db db) {
@@ -530,5 +616,11 @@ class Db extends ChangeNotifier {
       return "DbNull[${safeHash(db)}]";
     else
       return "DbNonNull[${safeHash(db)}]";
+  }
+
+  void printDirs() {
+    print("tmp: ${tmpDir()}");
+    print("docDir: ${docDir()}");
+    print("extDir: ${extDir()}");
   }
 }

@@ -345,6 +345,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.4.0"
+  ssplugin:
+    dependency: "direct main"
+    description:
+      path: "../ssplugin"
+      relative: true
+    source: path
+    version: "0.0.1"
   ssutil:
     dependency: "direct main"
     description:
@@ -401,6 +408,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.1.5"
+  url_launcher:
+    dependency: "direct main"
+    description:
+      name: url_launcher
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "3.0.1"
   utf:
     dependency: transitive
     description:

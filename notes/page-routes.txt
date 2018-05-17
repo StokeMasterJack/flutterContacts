@@ -1,61 +1,6 @@
 ContactsPage (Home)
-    props:
-        Db
-        dbCallbacks DbCallbacks
-
-    state:
-        tab: Tab{fav, active, all}
-        fContacts: Future<Contacts>
-
-    return none
-
-
-ContactsFilterPage
-    props:
-        db:Db
-        initQuery:Query
-
-    state:
-        q:TextEditingController
-        fContacts: Future<Contacts>
-
-    return: null
-
-ContactsSelectionPage
-    props:
-       db:Db
-       initQuery:Query
-       dbCallbacks:DbCallbacks
-
-    state:
-       fContacts: Future<Contacts>
-       selected: Set<Id>
-
-    return: null
-
-ContactPage
-    props:
-        db:Db
-        id:Id
-        dbCallbacks:DbCallbacks
-    state:
-        fContact: Future<Contact>
+    ContactsFilterPage (Local)
+    ContactsSelectionPage
 
 EditContactPage
-    props:
-        db:Db
-        id:Id?  null for new contact
-        dbCallbacks:DbCallbacks
-
-    state:
-        id:Id?
-        firstName:TextEditingController
-        lastName:TextEditingController
-        active: bool
-        favorite: bool
-        level: Level
-        color: Col
-
-    returns:
-        null
 

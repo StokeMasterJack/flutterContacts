@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ssutil/ssutil.dart' as ss;
 
+const String backupUrl = "https://randomuser.me/api/portraits/women/72.jpg";
+
 class FavGridView extends StatelessWidget {
   final Contacts contacts;
   final IdSet selected;
@@ -15,8 +17,7 @@ class FavGridView extends StatelessWidget {
     selected,
     @required this.onContactTap,
     this.onContactLongPress,
-  })
-      : assert(contacts != null),
+  })  : assert(contacts != null),
         assert(onContactTap != null),
         this.selected = selected ?? IdSet.empty;
 
@@ -26,68 +27,97 @@ class FavGridView extends StatelessWidget {
       return Center(child: Text("You have no contacts"));
     }
 
-    List<Widget> children = contacts.map((Contact contact) =>
-    new FavTile(
-        contact: contact,
-        selected: selected,
-        onTapContact: onContactTap,
-        onLongPressContact: onContactLongPress)).toList();
-
+    Widget contactToTile(Contact contact) {
+      return buildContactTile(context, contact);
+    }
 
     var g = new GridView.count(
-        padding: const EdgeInsets.all(20.0),
-        primary: false,
+        padding: const EdgeInsets.all(0.0),
+        primary: true,
         crossAxisCount: 2,
-        mainAxisSpacing: 10.0,
-        children: children
-    );
+        mainAxisSpacing: 0.0,
+        crossAxisSpacing: 0.0,
+        children: contacts.map(contactToTile).toList());
 
-
-
-
-    return new Padding(padding: const EdgeInsets.only(top: 16.0), child: g);
+    return new Padding(padding: const EdgeInsets.all(0.0).copyWith(top: 10.0), child: g);
   }
-}
 
+  Widget buildContactTile(BuildContext context, Contact contact) {
+    List<Color> colors = [Colors.red, Colors.grey, Colors.yellowAccent, Colors.grey];
 
-class FavTile extends StatelessWidget {
-  final Contact contact;
-  final IdSet selected;
-  final ContactCallback onTapContact;
-  final ContactCallback onLongPressContact;
+    colors = colors.map((_) => null).toList();
 
-  FavTile({@required this.contact, @required this.selected, @required this.onTapContact, this.onLongPressContact})
-      : assert(contact != null),
-        assert(selected != null),
-        assert(onTapContact != null);
+    Color tileColor = colors[0];
+    Color h1Color = colors[1];
+    Color avColor = colors[2];
+    Color lblColor = colors[3];
 
-//  Widget buildAvatar() {
-//    if (contact.thumbnail == null) {
-//      return new CircleAvatar(radius: 32.0, child: new Text(contact.firstName[0].toUpperCase()));
-//    } else {
-//      ImageProvider<NetworkImage> img = new NetworkImage(contact.thumbnail);
-//      return new CircleAvatar(radius: 32.0, backgroundImage: img);
-//    }
-//  }
+    int id = contact.id.value;
 
+    double avRadius = 52.0;
 
-  @override
-  Widget build(BuildContext context) {
-    Widget av = ss.isMissing(contact.thumbnail)
-        ? new CircleAvatar(radius: 32.0, child: new Text(contact.firstName[0].toUpperCase()))
-        : new CircleAvatar(radius: 32.0, backgroundImage: new NetworkImage(contact.thumbnail));
+    CircleAvatar av = ss.isMissing(contact.thumbnail)
+        ? new CircleAvatar(
+            key: SsKey(CircleAvatar, id), radius: avRadius, child: new Text(contact.firstName[0].toUpperCase()))
+        : new CircleAvatar(
+            key: SsKey(CircleAvatar, id), radius: avRadius, backgroundImage: new NetworkImage(contact.thumbnail));
 
-    return new InkWell(
-        onTap: () => this.onTapContact(context, contact),
-        onLongPress: onLongPressContact == null ? null : () => onLongPressContact(context, contact),
-        child: Column(
-          children: <Widget>[
-            new SizedBox(height: 16.0),
-            av,
-            new SizedBox(height: 12.0),
-            new Text(contact.fullName)
-          ],
-        )
+    final onTap = onContactTap == null ? null : () => onContactTap(context, contact);
+    final onLongPress = onContactLongPress == null ? null : () => onContactLongPress(context, contact);
+    final onCheckboxChanged = (_) => onContactTap(context, contact);
+
+    Widget wName = Text(contact.fullName, key: SsKey(Text, id));
+
+    Widget checkbox = Container(
+        alignment: Alignment.topLeft,
+        height: 20.0,
+        padding: EdgeInsets.all(0.0),
+        child: Opacity(
+            key: SsKey(Opacity, id, 1),
+            opacity: selected.isNotEmpty ? 1.0 : 0.0,
+            child: Checkbox(
+              key: SsKey(Checkbox, id),
+              value: selected.contains(contact.id),
+              onChanged: onCheckboxChanged,
+            )));
+
+    double h1 = 12.0;
+    double avHeight = avRadius * 2;
+    double h2 = 5.0;
+    double titleHeight = 16.0;
+
+    Column column = Column(
+      key: SsKey(Column, id),
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        Expanded(
+            child: Container(
+          color: h1Color,
+          padding: EdgeInsets.all(0.0),
+          child: checkbox,
+        )),
+        Container(child: av, color: avColor, alignment: Alignment.center),
+        Expanded(
+            child: Container(
+          child: wName,
+          color: lblColor,
+          alignment: Alignment.topCenter,
+          padding: EdgeInsets.only(top: 10.0),
+        ))
+      ],
     );
+
+    double tileHeight = h1 + avHeight + h2 + titleHeight - 40.0;
+
+    final box = Container(
+        constraints: BoxConstraints(minHeight: tileHeight),
+//        alignment: Alignment.bottomCenter,
+        color: tileColor,
+        child: column);
+
+//    return new GestureDetector(key: SsKey(InkWell, id), onTap: onTap, onLongPress: onLongPress, child: box);
+    return new InkWell(key: SsKey(InkWell, id), onTap: onTap, onLongPress: onLongPress, child: box);
   }
 }

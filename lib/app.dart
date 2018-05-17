@@ -1,152 +1,145 @@
+import 'package:contacts/PermPage.dart';
+import 'package:contacts/contact_detail.dart';
 import 'package:contacts/contact_edit_page.dart';
 import 'package:contacts/contacts.dart';
 import 'package:contacts/contacts_page.dart';
-import 'package:contacts/favorites_page.dart';
 import 'package:contacts/ui_common.dart';
 import 'package:flutter/material.dart';
 import 'package:ssutil_flutter/ssutil_flutter.dart';
-
-const Key materialAppKey = const ValueKey("MaterialAppKey");
-const Key contactsAppKey = const ValueKey("ContactsAppKey");
-const Key contactsPageKey = const ValueKey<String>("ContactsPageKey");
-const Key favoritesKey = const ValueKey<String>("FavoritesPageKey");
+import 'package:url_launcher/url_launcher.dart';
 
 class App extends SsStatefulWidget {
-  final Db db = Db();
-
   @override
-  createState() => new AppState();
-
-  App() : super(key: contactsAppKey);
+  createState() => AppState();
 }
 
 class AppState extends SsState<App> {
-  Db get db => widget.db;
+  final Db db = Db();
 
   @override
   void initState() {
     super.initState();
-    db.populateFromJsonAsset();
+    db.importFromJsonAsset();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-    return new MaterialApp(key: materialAppKey, onGenerateRoute: buildRoute);
+    return new MaterialApp(
+      home: _buildContactsPage(context),
+    );
   }
 
-  void dbDeleteAll(BuildContext context, IdSet ids) {
-    db.deleteAll(ids);
+  ContactsCallbacks mkCallbacks() {
+    return ContactsCallbacks(
+      exportToJson: db.serializeToDocDir,
+      clearDb: db.clearDb,
+      importRandom: db.importRecordsFromRandomUser,
+      importFromAsset: db.importFromJsonAsset,
+      deleteAll: db.deleteAll,
+      navToContactDetail: _navToContactDetail,
+      navToContactEdit: _navToContactEdit,
+    );
   }
 
-  void dbClear(BuildContext context) {
-    db.clear();
+  Widget _buildContactsPage(BuildContext context) {
+    return ContactsPage(
+      model: ContactsModel(computeData: (Filter f) => ContactsData(db.select(f)), db: db),
+      callbacks: mkCallbacks(),
+      drawerBuilder: mkDrawer,
+    );
   }
 
-  void dbSerialize(BuildContext context) {
-    db.serializeToFile();
+  Widget _buildContactEditPage(BuildContext context, Contact contact) {
+    return new ContactEditPage(initContact: contact);
   }
 
-  void dbPopulateFromRandomUser(BuildContext context) {
-    db.populateFromRandomUser(500);
+  Widget _buildContactDetailPage(BuildContext context, Contact contact) {
+    return new ContactDetailPage(contact, mkCallbacks());
   }
 
-  Route<dynamic> buildRoute(RouteSettings settings) {
-    return _buildRoute(new Rt(settings));
-  }
-
-  static List<RtBuilderFactory> factories = [ContactEditRtBuilder(), FavoritesRtBuilder(), ContactsRtBuilder()];
-
-
-  Route<dynamic> _buildRoute(Rt rt) {
-    for (RtBuilderFactory f in factories) {
-      Route<dynamic> r = f.maybeBuildRoute(rt, this);
-      if (r != null) return r;
+  void _navToContactEdit(BuildContext context, Contact contact) async {
+    Widget buildPage(BuildContext context) {
+      return _buildContactEditPage(context, contact ?? Contact.empty());
     }
-    return null;
+
+    Contact updatedContact = await navPush(context, buildPage);
+
+    if (updatedContact != null) {
+      setState(() {
+        db.put(updatedContact);
+      });
+    }
   }
 
-  List<Choice> buildChoices() {
-    return <Choice>[
-      Choice(title: 'clearDb', icon: Icons.directions_car, action: this.dbClear),
-      Choice(title: 'populateDbFromRandomUser', icon: Icons.directions_bike, action: dbPopulateFromRandomUser),
-      Choice(title: 'serializeDbToJson', icon: Icons.directions_boat, action: dbSerialize),
+  void _navToContactDetail(BuildContext context, Contact contact) async {
+    Widget buildPage(BuildContext context) {
+      return _buildContactDetailPage(context, contact);
+    }
+
+    navPush(context, buildPage);
+  }
+
+  void _onWriteExtFile() async {
+    db.serializeToExtDir();
+  }
+
+  _launchURL() async {
+    const url = 'https://drive.google.com/a/smart-soft.com/file/d/1Na4PcxJn_NbHcPNut171L4u-8lah5Kpy/view?usp=drivesdk';
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
+//
+//  void _onSliv(BuildContext ctx) {
+//    Widget b(BuildContext c) {
+//      return new ContactDetailPage();
+//    }
+//
+//    MaterialPageRoute r = MaterialPageRoute(builder: b);
+//    Navigator.push(ctx, r);
+//  }
+
+  Choices mkGeneralDrawerChoices(BuildContext context) {
+    return Choices([
+      Choice(title: 'External File', primary: true, icon: Icons.search, callback: _onWriteExtFile),
+      Choice(title: 'Request ', primary: true, icon: Icons.search, callback: _onWriteExtFile),
+      Choice(title: 'Nav to Perm Page ', primary: true, icon: Icons.search, callback: () => navToPermPage(context)),
+    ]);
+  }
+
+  void navToPermPage(BuildContext context) async {
+    PermPage p = PermPage();
+    await navPush(context, (_) => p);
+  }
+
+  Widget mkDrawer(BuildContext context) {
+    final List<Widget> children = <Widget>[
+      new DrawerHeader(
+          child: new Text('Drawer Header'),
+          decoration: new BoxDecoration(
+            color: Colors.blue,
+          ))
     ];
 
-  }
+    Choices gen = mkGeneralDrawerChoices(context);
+    children.addAll(gen.mkDrawerItems());
 
-  PopupMenuButton<Choice> buildPopupMenuButton(BuildContext context) {
-    return new PopupMenuButton<Choice>(
-      onSelected: (Choice choice) {
-        choice.action(context);
-      },
-      itemBuilder: (BuildContext context) {
-        List<Choice> choices = buildChoices();
-        return choices.map((Choice choice) {
-          return new PopupMenuItem<Choice>(
-              value: choice,
-              child: ListTile(
-                title: new Text(choice.title),
-                leading: new Icon(choice.icon),
-              ));
-        }).toList();
-      },
+    children.add(Divider());
+    children.add(Divider());
+
+    final d = new Drawer(
+      // Add a ListView to the drawer. This ensures the user can scroll
+      // through the options in the Drawer if there isn't enough vertical
+      // space to fit everything.
+      child: new ListView(
+          // Important: Remove any padding from the ListView.
+          padding: EdgeInsets.zero,
+          children: children),
     );
+
+    return d;
   }
-}
-
-class ContactEditNav {
-  static ContextAction<Id> navToContactEdit = ContactEditPage.navToContactEdit;
-  static ContextCallback navToContactNew = ContactEditPage.navToContactNew;
-}
-
-class ContactEditRtBuilder extends RtBuilderFactory<AppState> {
-  @override
-  String prefix = ContactEditPage.prefix;
-
-  @override
-  Widget buildPage(BuildContext context, Rt rt, AppState app) {
-    Id id;
-    if (rt.isLastSegmentAnIntId) {
-      id = rt.parseId();
-    } else {
-      id = null;
-    }
-    Contact c = app.db.initContact(id);
-    return ContactEditPage(db: app.db, initContact: c);
-  }
-}
-
-class FavoritesRtBuilder extends RtBuilderFactory<AppState> {
-  @override
-  String prefix = FavoritesPage.prefix;
-
-  @override
-  Widget buildPage(BuildContext context, Rt rt, AppState app) {
-    Contacts contacts = app.db.favorites();
-    return FavoritesPage(
-      contacts: contacts,
-      navToContactEdit: ContactEditNav.navToContactEdit,
-      navToContactNew: ContactEditNav.navToContactNew,
-    );
-  }
-}
-
-class ContactsRtBuilder extends RtBuilderFactory<AppState> {
-  @override
-  @override
-  Widget buildPage(BuildContext context, Rt rt, AppState app) {
-    return ContactsPage(
-        key: contactsPageKey,
-        db: app.db,
-        dbListenable: app.db,
-        menuBuilder: app.buildPopupMenuButton,
-        navToContactEdit: ContactEditNav.navToContactEdit,
-        navToContactNew: ContactEditNav.navToContactNew,
-        navToFavorites: FavoritesPage.navToFavorites,
-        onDeleteAll: app.dbDeleteAll);
-  }
-
-  @override
-  bool isMatch(Rt rt, AppState t) => rt.isPrefix("/");
 }

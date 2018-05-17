@@ -8,13 +8,18 @@ import 'package:ssutil/ssutil.dart';
 
 final Random _rng = new Random();
 
-Future<Contacts> fetchSampleDataFromRandomUser(int n) async {
-  List<Contact> data1 = await _fetchSampleDataFromRandomUser(n);
+Future<Contacts> fetchSampleDataFromRandomUser3(int n) async {
+  List<Contact> data1 = await fetchSampleDataFromRandomUser2(n);
   List<Contact> noNulls = data1.where((c) => c != null).toList();
   return Contacts(noNulls);
 }
 
-Future<List<Contact>> _fetchSampleDataFromRandomUser(int n) {
+Future<List<Contact>> fetchSampleDataFromRandomUser2(int n) {
+  List<Future<Contact>> futures = fetchSampleDataFromRandomUser1(n);
+  return Future.wait(futures);
+}
+
+List<Future<Contact>> fetchSampleDataFromRandomUser1(int n) {
   List<Future<Contact>> futures = [];
   for (int i = 0; i < n; i++) {
     Future<Contact> ff = new Future.delayed(new Duration(milliseconds: i * 10), () async {
@@ -35,7 +40,7 @@ Future<List<Contact>> _fetchSampleDataFromRandomUser(int n) {
     futures.add(ff);
   }
 
-  return Future.wait(futures);
+  return futures;
 }
 
 Level _randomLevel() {
@@ -51,19 +56,24 @@ Col _randomColor() {
 Contact _createContactFromRandomUserJson(int id, Map<String, dynamic> map1, bool fav) {
   final map2 = map1["results"][0];
   return new Contact(
-      id: Id(id),
-      firstName: capFirstLetter(map2['name']['first']),
-      lastName: capFirstLetter(map2['name']['last']),
-      active: _rng.nextBool(),
-      color: _randomColor(),
-      level: _randomLevel(),
-      favorite: fav,
-      nat: map2["nat"],
-      thumbnail: map2["picture"]["thumbnail"]);
+    id: Id(id),
+    firstName: capFirstLetter(map2['name']['first']),
+    lastName: capFirstLetter(map2['name']['last']),
+    active: _rng.nextBool(),
+    color: _randomColor(),
+    level: _randomLevel(),
+    favorite: fav,
+    nat: map2["nat"],
+    largeImg: map2["picture"]["large"],
+    mediumImg: map2["picture"]["medium"],
+    thumbnail: map2["picture"]["thumbnail"],
+  );
 }
 
-//Future<List<Contact>> fetchSampleDataFromMem() async {
-//  List<Map<String, dynamic>> listOfMaps = rawContactData;
-//  List<Contact> contacts = Contact.fromJsonList(listOfMaps);
-//  return Future.value(contacts);
-//}
+/*
+ "picture": {
+        "large": "https://randomuser.me/api/portraits/men/83.jpg",
+        "medium": "https://randomuser.me/api/portraits/med/men/83.jpg",
+        "thumbnail": "https://randomuser.me/api/portraits/thumb/men/83.jpg"
+      }
+ */

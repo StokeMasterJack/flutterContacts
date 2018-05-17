@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:contacts/contact_list_view.dart';
 import 'package:contacts/contacts.dart';
@@ -6,152 +7,179 @@ import 'package:contacts/fav_grid_view.dart';
 import 'package:contacts/ui_common.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart';
+import 'package:ssplugin/ssplugin.dart';
+import 'package:ssutil/ssutil.dart' as ss;
+import 'package:ssutil/ssutil.dart';
 import 'package:ssutil_flutter/ssutil_flutter.dart';
 
 class ContactsPage extends SsStatefulWidget {
-  static const String prefix = "/";
+  final ContactsCallbacks callbacks;
+  final ContactsModel model;
+  final WidgetBuilder drawerBuilder;
 
-  final Db db;
-  final Listenable dbListenable;
-
-  final MenuBuilder menuBuilder;
-  final ContextCallback navToContactNew;
-  final ContextAction<Id> navToContactEdit;
-  final ContextCallback navToFavorites;
-  final ContextAction<IdSet> onDeleteAll;
-
-  ContactsPage({
-    Key key,
-    @required this.db,
-    @required this.dbListenable,
-    @required this.menuBuilder,
-    @required this.navToContactNew,
-    @required this.navToContactEdit,
-    @required this.navToFavorites,
-    @required this.onDeleteAll,
-  }) : super(key: key);
+  ContactsPage({@required this.model, @required this.callbacks, this.drawerBuilder});
 
   @override
   createState() => ContactsPageState();
+
+  static const String prefix = "/";
+
+  final List<TabInfo> _tabInfos = <TabInfo>[
+    TabInfo(key: TabKey.favorites, iconData: Icons.star),
+    TabInfo(key: TabKey.active, iconData: Icons.people),
+    TabInfo(key: TabKey.all, iconData: Icons.history)
+  ];
 }
 
-enum TabKey { fav, active, inactive }
-
 class TabInfo {
-  final int index;
   final TabKey key;
-  final String title;
   final IconData iconData;
-  final Tab tab;
 
-  TabInfo({this.index, this.key, this.title, this.iconData, this.tab});
+  TabInfo({this.key, this.iconData});
 
   Tab buildTab(BuildContext context) {
     return Tab(
       key: ValueKey(key.toString()),
-//      icon: new Icon(iconData),
-      text: title,
+      icon: new Icon(iconData),
+      text: "$title",
     );
+  }
+
+  String get title {
+    String enumName = describeEnum(key);
+    return ss.capFirstLetter(enumName);
   }
 }
 
 class ContactsPageState extends SsState<ContactsPage> with SingleTickerProviderStateMixin {
-  final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>(debugLabel: "ContactsPageKey");
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey(debugLabel: "contactsScaffoldKey");
+
+  ContactsModel get _model => widget.model;
+
+  ContactsCallbacks get _callbacks => widget.callbacks;
+
+  //mutable state
 
   bool _isSearchMode = false;
-
   MutableIdSet _selected = MutableIdSet();
-
-  Contacts contacts = Contacts.empty;
-
   final TextEditingController _searchController = new TextEditingController();
   TabController _tabController;
 
-  final _tabInfos = <TabInfo>[
-    TabInfo(index: 0, key: TabKey.fav, title: "Favorites", iconData: Icons.star),
-    TabInfo(index: 1, key: TabKey.active, title: "Active", iconData: Icons.people),
-    TabInfo(index: 2, key: TabKey.inactive, title: "Inactive", iconData: Icons.history)
-  ];
+  Listenable _masterEventSource;
 
-  Listenable listenable;
+  String _statusBarText;
+
+  final Map<Perm, bool> permMap = {};
+
+  void _onChange() {
+    setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
 
-    _tabController = new TabController(vsync: this, length: _tabInfos.length);
+    _tabController = new TabController(vsync: this, length: widget._tabInfos.length);
 
-    Listenable listenable = new Listenable.merge([db, _searchController, _tabController]);
+    _masterEventSource = new Listenable.merge([_tabController, _searchController, _model.db]);
 
-    listenable.addListener(this.myListener);
+    _masterEventSource.addListener(_onChange);
   }
 
-  void myListener() {
-    setState(() {});
+  @override
+  void dispose() {
+    super.dispose();
+    _masterEventSource.removeListener(_onChange);
   }
 
-  Db get db => widget.db;
+  ContactsData _selectContacts() {
+    return widget.model.computeData(_currentFilter);
+  }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    ContactsData data = _selectContacts();
+
     return new Scaffold(
-        key: _scaffoldKey,
-        floatingActionButton: buildActionButton(context),
-        appBar: _buildAppBar(context),
-        body: new TabBarView(
-          controller: _tabController,
-          children: [
-            buildFavViewGrid(context, computeContactsFavTab()),
-            buildContentListView(context, computeContactsActiveTab()),
-            buildContentListView(context, computeContactsInactiveTab()),
-          ],
-        ));
+      key: _scaffoldKey,
+      drawer: _maybeMkDrawer(context),
+      floatingActionButton: _buildActionButton(context),
+      appBar: _buildAppBar(context),
+      body: _buildBody(context, data),
+      bottomNavigationBar: _buildStatusBar(context),
+    );
   }
 
-  Widget _buildAppBar(BuildContext context) {
+  Drawer _maybeMkDrawer(BuildContext context) {
     if (_isSelectionMode) {
-      return _buildSelectionAppBar(context);
+      return null;
     } else if (_isSearchMode) {
-      return _buildSearchAppBar(context);
+      return null;
     } else {
-      return buildMainAppBar(context);
+      return widget.drawerBuilder(context);
     }
   }
 
-  Widget buildContentListView(BuildContext context, Contacts contacts) {
+  Widget _buildBody(BuildContext context, ContactsData data) {
+    return new TabBarView(
+      controller: _tabController,
+      children: [
+        _buildFavViewGrid(context, data.favs),
+        _buildContentListView(context, data.actives),
+        _buildContentListView(context, data.all),
+      ],
+    );
+  }
+
+  _buildStatusBar(BuildContext context) {
+    if (_statusBarText == null) return null;
+    return Container(
+      color: Colors.grey,
+      child: Text(_statusBarText, style: Theme.of(context).textTheme.body2.copyWith(color: Colors.red)),
+      height: 30.0,
+      alignment: Alignment.center,
+      padding: EdgeInsets.all(10.0),
+    );
+  }
+
+  Widget _buildContentListView(BuildContext context, Contacts contacts) {
     return new ContactListView(
         contacts: contacts,
         selected: _selected.immutable(),
-        onContactTap: onContactTap,
-        onContactLongPress: onContactLongPress);
+        onContactTap: _onContactTap,
+        onContactLongPress: _onContactLongPress);
   }
 
-  Widget buildFavViewGrid(BuildContext context, Contacts contacts) {
+  Widget _buildFavViewGrid(BuildContext context, Contacts contacts) {
     return new FavGridView(
         contacts: contacts,
         selected: _selected.immutable(),
-        onContactTap: onContactTap,
-        onContactLongPress: onContactLongPress);
+        onContactTap: _onContactTap,
+        onContactLongPress: _onContactLongPress);
   }
 
-  void onContactTap(BuildContext context, Contact contact) {
+  void _onContactTap(BuildContext context, Contact contact) {
     if (_isSelectionMode) {
       setState(() {
         _selected.toggleSelection(contact.id);
       });
     } else {
-      widget.navToContactEdit(context, contact.id);
+      _callbacks.navToContactDetail(context, contact);
+//      _callbacks.navToContactEdit(context, contact);
     }
   }
 
-  void onContactLongPress(BuildContext context, Contact contact) {
+  void _onContactLongPress(BuildContext context, Contact contact) {
     if (!_isSelectionMode) {
-      onSelectionModeBegin(context, contact.id);
+      _onSelectionModeBegin(contact.id);
     }
   }
 
-  void onSelectionModeBegin(BuildContext context, Id firstId) {
+  void _onSelectionModeBegin(Id firstId) {
+    BuildContext context = _scaffoldKey.currentContext;
     ModalRoute.of(context).addLocalHistoryEntry(new LocalHistoryEntry(
       onRemove: () {
         setState(() {
@@ -166,13 +194,8 @@ class ContactsPageState extends SsState<ContactsPage> with SingleTickerProviderS
 
   bool get _isSelectionMode => _selected.isNotEmpty;
 
-  @override
-  void dispose() {
-    super.dispose();
-    listenable.removeListener(this.myListener);
-  }
-
-  void onSearchModeBegin(BuildContext context) {
+  void _onSearchModeBegin() {
+    BuildContext context = _scaffoldKey.currentContext;
     ModalRoute.of(context).addLocalHistoryEntry(new LocalHistoryEntry(
       onRemove: () {
         setState(() {
@@ -183,177 +206,200 @@ class ContactsPageState extends SsState<ContactsPage> with SingleTickerProviderS
     ));
     setState(() {
       this._isSearchMode = true;
+      _tabController.index = 2;
     });
   }
 
-  String get currentQuery {
-    return _searchController.text;
+  bool _currentFilter(Contact c) {
+    if (!_isSearchMode || ss.isMissing(_searchController.text)) return true;
+    return c.matchesSearchFilter(_searchController.text);
   }
 
-  bool searchFilter(Contact c) {
-    String q = currentQuery;
-    return Filters.createSearchStringFilter(q)(c);
-  }
-
-  bool currentFilterFavTab(Contact c) {
-    Filter f1 = Filters.favFilter;
-    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
-    return f1(c) && f2(c);
-  }
-
-  bool currentFilterActiveTab(Contact c) {
-    Filter f1 = Filters.activeFilter;
-    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
-    return f1(c) && f2(c);
-  }
-
-  bool currentFilterInactiveTab(Contact c) {
-    Filter f1 = Filters.inactiveFilter;
-    Filter f2 = _isSearchMode ? searchFilter : Filters.trueFilter;
-    return f1(c) && f2(c);
-  }
-
-  Contacts computeContactsFavTab() {
-    List<Contact> list = db.selectDefaultSort(currentFilterFavTab);
-    return new Contacts(list);
-  }
-
-  Contacts computeContactsActiveTab() {
-    List<Contact> list = db.selectDefaultSort(currentFilterActiveTab);
-    return new Contacts(list);
-  }
-
-  Contacts computeContactsInactiveTab() {
-    List<Contact> list = db.selectDefaultSort(currentFilterInactiveTab);
-    return new Contacts(list);
-  }
-
-  Widget buildActionButton(BuildContext context) {
-    if (_isSelectionMode) return null;
-    if (_isSearchMode) return null;
+  Widget _buildActionButton(BuildContext context) {
+    if (_isSelectionMode || _isSearchMode) return null;
     return new FloatingActionButton(
         onPressed: () {
-          widget.navToContactNew(context);
+          _callbacks.navToContactEdit(context, null);
         },
         child: const Icon(Icons.add));
   }
 
-  Filter computeCurrentFilter(int currentTabIndex) {
-    switch (currentTabIndex) {
-      case 0:
-        return currentFilterFavTab;
-      case 1:
-        return currentFilterActiveTab;
-      case 2:
-        return currentFilterInactiveTab;
-      default:
-        throw new StateError("");
+  AppBar _buildAppBar(BuildContext context) {
+    TabBar tabBar = _buildTabBar(context);
+    if (_isSelectionMode) {
+      return new AppBar(
+        leading: new IconButton(
+            padding: EdgeInsets.all(0.0),
+            icon: const Icon(Icons.cancel),
+            onPressed: () {
+              setState(() {
+                Navigator.pop(context);
+              });
+            }),
+        title: Text("${_selected.length} selected"),
+        actions: _buildActionsSelectedMode(context),
+        bottom: tabBar,
+        titleSpacing: 0.0,
+      );
+    } else if (_isSearchMode) {
+      return new AppBar(
+        title: new TextField(
+          autofocus: true,
+          controller: _searchController,
+          decoration: new InputDecoration(
+              filled: true,
+              fillColor: Colors.white,
+              hintText: "Find contacts",
+              isDense: true,
+              suffixIcon: (_searchController.text == null || _searchController.text.isEmpty)
+                  ? null
+                  : new IconButton(
+                      icon: const Icon(Icons.cancel),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                        });
+                      })),
+        ),
+        bottom: tabBar,
+      );
+    } else {
+      return AppBar(title: Text("Contacts"), actions: _buildActionsMain(context), bottom: tabBar);
     }
   }
 
-  int computeCurrentLength() {
-    Filter currentFilter = computeCurrentFilter(currentTabIndex);
-    return db.count(currentFilter);
-  }
-
-  String buildPageTitle() {
-    int length = computeCurrentLength();
-    String title = tabInfo.title;
-    return "$title [$length]";
-  }
-
-  Widget _buildSearchAppBar(BuildContext context) {
-    return new AppBar(
-      title: new TextField(
-        //        autofocus: true,
-        controller: _searchController,
-        decoration: new InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: "Find contacts",
-            isDense: true,
-            suffixIcon: (_searchController.text == null || _searchController.text.isEmpty)
-                ? null
-                : new IconButton(
-                    icon: const Icon(Icons.cancel),
-                    onPressed: () {
-                      setState(() {
-                        _searchController.clear();
-                      });
-                    })),
-      ),
-      bottom: buildTabBar(context),
-    );
-  }
-
-  void onPressedNavToFavorites(BuildContext context) {
-    widget.navToFavorites(context);
-  }
-
-  Widget _buildSelectionAppBar(BuildContext context) {
-    return new AppBar(
-      //      backgroundColor: Theme.of(context).canvasColor,
-      leading: new IconButton(
-          icon: const Icon(Icons.cancel),
-          onPressed: () {
-            setState(() {
-              Navigator.pop(context);
-            });
-          }),
-      title: new Text(_selected.length.toString()),
-      actions: <Widget>[
-        new IconButton(
-          icon: Icon(Icons.delete),
-          onPressed: () async {
-            bool confirmed = await _showDeleteDialog(context);
-            if (confirmed) {
-              widget.onDeleteAll(context, IdSet(_selected));
-              postDeleteSnack();
-              Navigator.pop(context);
-            }
-          },
-        )
-      ],
-      bottom: buildTabBar(context),
-    );
-  }
-
-  Widget buildMainAppBar(BuildContext context) {
-    String title = buildPageTitle();
-    return AppBar(
-        title: Text(title),
-        actions: <Widget>[
-          new IconButton(icon: Icon(Icons.search), onPressed: () => onSearchModeBegin(context)),
-          new IconButton(icon: Icon(Icons.favorite), onPressed: () => onPressedNavToFavorites(context)),
-          widget.menuBuilder(context)
-        ],
-        bottom: buildTabBar(context));
-  }
-
-  TabBar buildTabBar(BuildContext context) {
+  TabBar _buildTabBar(BuildContext context) {
     Tab f(TabInfo ti) => ti.buildTab(context);
-    List<Tab> tabs = _tabInfos.map(f).toList();
-    return TabBar(controller: _tabController, tabs: tabs);
+    List<TabInfo> tabInfos = widget._tabInfos;
+    List<Tab> tabs = tabInfos.map(f).toList();
+    return TabBar(
+      controller: _tabController,
+      tabs: tabs,
+    );
   }
 
-  Future<bool> _showDeleteDialog(BuildContext context) async {
+  void _onClearDb() async {
+    bool confirm = await _showOkCancelDialog(msg: "Delete all data?");
+    if (confirm) {
+      this._callbacks.clearDb();
+      _snack("DB Reset!");
+    }
+  }
+
+  void _onExportToJson() async {
+    File file = await _callbacks.exportToJson();
+    String localName = basename(file.path);
+    _snack("Export to file [$localName] complete");
+  }
+
+  void _onImportRandom() async {
+    setState(() {
+      _statusBarText = "Importing random data...";
+    });
+
+    await _callbacks.importRandom();
+    _statusBarText = null;
+    _snack("Random import complete");
+  }
+
+  void _onImportFromAsset() async {
+    await _callbacks.importFromAsset();
+    _snack("Import complete!");
+  }
+
+  void _onImportFromExtFile() async {
+    await _callbacks.importFromAsset();
+
+    _snack("Import complete!");
+  }
+
+  void _onDeleteSelected() async {
+    final int count = _selected.length;
+    bool confirm = await _showOkCancelDialog(msg: 'Delete $count selected records?', okText: "Delete");
+    if (confirm) {
+      _callbacks.deleteAll(_selected.immutable());
+      _selected.clear();
+      Navigator.pop(_scaffoldKey.currentContext);
+      _snack("$count records deleted");
+    }
+  }
+
+  void _onTodo() async {
+    _snack("Todo");
+  }
+
+  List<Widget> _buildActionsMain(BuildContext context) {
+    return Choices([
+      Choice(title: 'Search Mode', primary: true, icon: Icons.search, callback: _onSearchModeBegin),
+      Choice(title: 'Clear DB', icon: Icons.directions_car, callback: _onClearDb),
+      Choice(title: 'Export to JSON', icon: Icons.directions_boat, callback: _onExportToJson),
+      Choice(title: 'Import random contacts', icon: Icons.directions_bike, callback: _onImportRandom),
+      Choice(title: 'Import from JSON Asset', icon: Icons.directions_bike, callback: _onImportFromAsset),
+      Choice(title: 'Import from JSON External File', icon: Icons.directions_bike, callback: _onImportFromExtFile),
+    ]).buildActions();
+  }
+
+  List<Widget> _buildActionsSelectedMode(BuildContext context) {
+    return Choices([
+      Choice(title: 'Delete selected', primary: true, icon: Icons.delete, callback: _onDeleteSelected),
+      Choice(title: 'Export selected', icon: Icons.directions_bike, callback: _onTodo),
+      Choice(title: 'Share selected', icon: Icons.directions_boat, callback: _onTodo),
+    ]).buildActions();
+  }
+
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason> _snack(String msg) {
+    return snack(_scaffoldKey, msg);
+  }
+
+  Future<bool> _showOkCancelDialog(
+      {@required String msg, String title = "Confirm", String okText = "Ok", String cancelText = "Cancel"}) async {
     return showOkCancelDialog(
-        context: context, content: 'Delete ${_selected.length} selected records?', okText: "Delete");
+        context: _scaffoldKey.currentContext, msg: msg, title: title, okText: okText, cancelText: cancelText);
   }
+}
 
-  int get currentTabIndex => _tabController.index;
+class ContactsData {
+  final Map<TabKey, Contacts> _map;
 
-  TabInfo get tabInfo => _tabInfos[currentTabIndex];
+  ContactsData(Contacts contacts)
+      : this._map = {TabKey.favorites: contacts.favorites(), TabKey.active: contacts.actives(), TabKey.all: contacts};
 
-  void postDeleteSnack() {
-    _scaffoldKey.currentState.showSnackBar(new SnackBar(
-      content: new Text('Purchased ${43} for ${"fred"}'),
-      action: new SnackBarAction(
-        label: 'BUY MORE',
-        onPressed: () {
-          print("onPressed");
-        },
-      ),
-    ));
-  }
+  Contacts get favs => _map[TabKey.favorites];
+
+  Contacts get actives => _map[TabKey.active];
+
+  Contacts get all => _map[TabKey.all];
+}
+
+class ContactsModel {
+  final ContactsData Function(Filter filter) computeData;
+  final Listenable db;
+
+  ContactsModel({this.computeData, this.db});
+}
+
+class ContactsCallbacks {
+  VoidCallback clearDb;
+  AsyncAction<File> exportToJson;
+  AsyncAction<void> importRandom;
+  AsyncAction<bool> importFromAsset;
+
+  Command<IdSet> deleteAll;
+  Command<IdSet> onShareSelected;
+  Command<IdSet> onExportSelected;
+
+  ContextAction<Contact> navToContactEdit;
+  ContextAction<Contact> navToContactDetail;
+
+  ContactsCallbacks({
+    this.clearDb,
+    this.exportToJson,
+    this.importRandom,
+    this.importFromAsset,
+    this.deleteAll,
+    this.onShareSelected,
+    this.onExportSelected,
+    this.navToContactEdit,
+    this.navToContactDetail,
+  });
 }

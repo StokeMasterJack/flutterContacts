@@ -1,13 +1,14 @@
+import 'package:collection/collection.dart';
 import 'package:contacts/contacts.dart';
 import 'package:flutter/material.dart';
-import 'package:ssutil/ssutil.dart' as ss;
-import 'package:ssutil_flutter/ssutil_flutter.dart';
 
 typedef ContactCallback(BuildContext context, Contact contact);
-typedef PopupMenuButton<Choice> MenuBuilder(BuildContext context);
+typedef PopupMenuButton<Choice> MenuBuilder(GlobalKey<ScaffoldState> scaffoldKey);
 
 typedef bool RtPredicate(Rt rt);
 typedef Route RtBuilder(Rt rt);
+
+typedef Widget PageBuilder(BuildContext context, Rt rt);
 
 class Rt {
   static const String newSuffix = "/new";
@@ -38,14 +39,14 @@ class Rt {
     return p.last.trim();
   }
 
-  bool get isLastSegmentAnIntId {
+  bool get isLastSegmentId {
     String l = last;
     if (l == null) return false;
     return isInt(l);
   }
 
   Id parseId() {
-    if (!isLastSegmentAnIntId) throw FormatException("isLastSegmentAnIntId = false");
+    if (!isLastSegmentId) throw FormatException("isLastSegmentAnIntId = false");
     String sId = last;
     int iId = int.tryParse(sId);
     if (iId == null) {
@@ -64,48 +65,131 @@ class Rt {
   }
 
   bool isInt(String s) {
-    try {
-      int.parse(s);
-      return true;
-    } catch (e) {
-      return false;
+    if (s == null) return false;
+    if (s.trim().isEmpty) return false;
+    return int.tryParse(s.trim()) != null;
+  }
+
+  Route<T> buildRoute<T>(PageBuilder pageBuilder) {
+    Widget widgetBuilder(BuildContext context) {
+      return pageBuilder(context, this);
     }
+
+    return new MaterialPageRoute<T>(builder: widgetBuilder, settings: settings);
+  }
+
+  Id get lastSegmentAsId {
+    return parseId();
+  }
+
+  Route<dynamic> badRoute() {
+    Text w = Text("Bad Route:[${settings.name}]");
+    Center c = Center(child: w);
+    WidgetBuilder b = (_) => c;
+    return MaterialPageRoute<dynamic>(builder: b, settings: settings);
   }
 }
 
-class RtBuilderFactory<T> {
-  String prefix = "PREFIX";
+class Choices extends DelegatingList<Choice> {
+  Choices([List<Choice> del]) : super(del ?? []);
 
-  bool isMatch(Rt rt, T t) {
-    return isPrefix(rt, t);
+  List<Choice> get primaryChoices => where((Choice c) => c.primary).toList();
+
+  List<Choice> get secondaryChoices => where((Choice c) => !c.primary).toList();
+
+  List<Widget> buildActions() {
+    Widget choiceToAction(Choice choice) => choice.buildAction();
+    List<Widget> actions = primaryChoices.map(choiceToAction).toList();
+    actions.add(mkPopupMenuButton());
+    return actions;
   }
 
-  bool isPrefix(Rt rt, T t) {
-    return rt.isPrefix(prefix);
+  List<PopupMenuItem<Choice>> buildPopupMenuItems() {
+    PopupMenuItem<Choice> buildPopupMenuItem(Choice choice) => choice.buildPopupMenuItem();
+    return secondaryChoices.map(buildPopupMenuItem).toList();
   }
 
-  Route<dynamic> maybeBuildRoute(Rt rt, T t) {
-    if (!isMatch(rt, t)) return null;
-    return buildRoute(rt, t);
+  PopupMenuButton<Choice> mkPopupMenuButton() {
+    return new PopupMenuButton<Choice>(
+        onSelected: (Choice choice) => choice.callback(), itemBuilder: (BuildContext context) => buildPopupMenuItems());
   }
 
-  Route<dynamic> buildRoute(Rt rt, T t) {
-    return new MaterialPageRoute<void>(
-        settings: rt.settings, builder: (BuildContext context) => buildPage(context, rt, t));
+  Choices plus(Choices other) {
+    List<Choice> a = [];
+    a.addAll(this);
+    a.addAll(other);
+    return Choices(a);
   }
 
-  Widget buildPage(BuildContext context, Rt rt, T t) => ss.unsupported();
+
+  List<Widget> mkDrawerItems() {
+     return map((Choice c) => c.mkDrawerItem()).toList();
+   }
 }
 
 class Choice {
-  Choice({this.title, this.icon, this.action});
+  Choice({this.primary = false, this.title = "None", this.icon, this.callback});
 
+  final bool primary;
   final String title;
   final IconData icon;
-  final ContextCallback action;
+  final VoidCallback callback;
 
   @override
   String toString() {
     return 'Choice{title: $title}';
+  }
+
+  PopupMenuItem<Choice> buildPopupMenuItem() {
+    return new PopupMenuItem<Choice>(
+        value: this,
+        child: ListTile(
+          title: new Text(title),
+          leading: new Icon(icon),
+        ));
+  }
+
+  Widget buildAction() {
+    return IconButton(
+      icon: new Icon(this.icon),
+      onPressed: () {
+        if (callback != null) {
+          callback();
+        }
+      },
+    );
+  }
+
+  Widget mkDrawerItem() {
+    return ListTile(
+      leading: Icon(icon),
+      title: new Text(title),
+      onTap: () => callback(),
+    );
+  }
+
+
+}
+
+class SsKey extends LocalKey {
+  const SsKey(this.widgetType, [this.id1 = "1", this.id2 = ""]);
+
+  final Type widgetType;
+  final Object id1;
+  final Object id2;
+
+  @override
+  bool operator ==(dynamic other) {
+    if (other.runtimeType != runtimeType) return false;
+    final SsKey typedOther = other;
+    return widgetType == typedOther.widgetType && id1 == typedOther.id1 && id2 == typedOther.id2;
+  }
+
+  @override
+  int get hashCode => hashValues(runtimeType, id1, id2);
+
+  @override
+  String toString() {
+    return 'SsKey($widgetType$id1$id2)';
   }
 }

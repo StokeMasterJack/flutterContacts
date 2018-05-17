@@ -393,6 +393,13 @@
             </list>
           </value>
         </entry>
+        <entry key="ssplugin">
+          <value>
+            <list>
+              <option value="$repos$/_FlutterProjects/ssplugin/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="stack_trace">
           <value>
             <list>
@@ -438,6 +445,13 @@
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dartlang.org/typed_data-1.1.5/lib" />
               <option value="$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/typed_data-1.1.5/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="url_launcher">
+          <value>
+            <list>
+              <option value="$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/url_launcher-3.0.1/lib" />
             </list>
           </value>
         </entry>
@@ -596,6 +610,7 @@
       <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/term_glyph-1.0.0/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/test-0.12.34/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/typed_data-1.1.5/lib" />
+      <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/url_launcher-3.0.1/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/utf-0.9.0+4/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/vector_math-2.0.6/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/.pub-cache/hosted/pub.dartlang.org/watcher-0.9.7+7/lib" />
@@ -605,6 +620,7 @@
       <root url="file://$USER_HOME$/p-dart/flutter/bin/cache/pkg/sky_engine/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/packages/flutter/lib" />
       <root url="file://$USER_HOME$/p-dart/flutter/packages/flutter_test/lib" />
+      <root url="file://$repos$/_FlutterProjects/ssplugin/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

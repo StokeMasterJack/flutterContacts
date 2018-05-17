@@ -10,24 +10,16 @@ const itemPaddingOther = EdgeInsets.fromLTRB(12.0, 0.0, 12.0, 0.0);
 
 class ContactEditPage extends StatefulWidget {
   final Contact initContact;
-  final Db db;
+  final bool isNew;
 
-  ContactEditPage({@required this.db, @required this.initContact})
-      : assert(db != null),
-        assert(initContact != null);
+  ContactEditPage({@required Contact initContact})
+      : this.initContact = initContact == null ? Contact.empty() : initContact.nullNormalize(),
+        this.isNew = initContact == null ? true : false;
+
+  static const String prefix = "ContactEdit";
 
   @override
   State createState() => _ContactEditPageState();
-
-  static const String prefix = "/ContactEdit";
-
-  static void navToContactEdit(BuildContext context, Id id) {
-    Navigator.pushNamed(context, '/ContactEdit/$id');
-  }
-
-  static void navToContactNew(BuildContext context) {
-    Navigator.pushNamed(context, '/ContactEdit/new');
-  }
 }
 
 List<DropdownMenuItem<Level>> buildDropdownItems(BuildContext context) {
@@ -40,70 +32,119 @@ List<DropdownMenuItem<Level>> buildDropdownItems(BuildContext context) {
 }
 
 class _ContactEditPageState extends SsState<ContactEditPage> {
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey(debugLabel: "contactEditScaffoldKey");
+  final GlobalKey<FormState> _formKey = new GlobalKey<FormState>();
   final TextEditingController firstName = TextEditingController();
   final TextEditingController lastName = TextEditingController();
+  final TextEditingController largeImg = TextEditingController();
+  final TextEditingController mediumImg = TextEditingController();
   final TextEditingController thumbnail = TextEditingController();
+  final TextEditingController nat = TextEditingController();
   Col col;
   Level level;
   bool active;
   bool favorite;
 
+  Listenable _listenable;
+
+  void _myListener() {
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
-    final Contact c = widget.initContact;
+    _initFromContact();
+
+    _listenable = new Listenable.merge([firstName, lastName, largeImg, mediumImg, thumbnail, nat]);
+    _listenable.addListener(_myListener);
+  }
+
+  @override
+  void dispose() {
+    _listenable.removeListener(_myListener);
+    super.dispose();
+  }
+
+  void _initFromContact() {
+    Contact c = widget.initContact;
     firstName.text = c.firstName;
     lastName.text = c.lastName;
     thumbnail.text = c.thumbnail;
+    mediumImg.text = c.mediumImg;
+    largeImg.text = c.largeImg;
     col = c.color;
     level = c.level;
     active = c.active;
     favorite = c.favorite;
   }
 
+  bool _isDirty() {
+    Contact c1 = widget.initContact;
+    Contact c2 = _buildContact();
+    return c1 != c2;
+  }
+
+  Contact init() => widget.initContact ?? Contact.empty();
+
   Contact _buildContact() {
     Contact c = widget.initContact;
     return new Contact(
-        id: c.id,
-        firstName: firstName.text,
-        lastName: lastName.text,
-        thumbnail: thumbnail.text,
-        color: col,
-        level: level,
-        active: active,
-        nat: c.nat,
-        favorite: favorite);
+      id: c.id,
+      firstName: firstName.text,
+      lastName: lastName.text,
+      color: col,
+      level: level,
+      active: active,
+      favorite: favorite,
+      nat: c.nat,
+      largeImg: largeImg.text,
+      mediumImg: mediumImg.text,
+      thumbnail: thumbnail.text,
+    ).nullNormalize();
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     return new Scaffold(
-      appBar: new AppBar(
-        title: Text("Edit Contact"),
-        actions: <Widget>[
-          new FlatButton(
-            child: Text("SAVE", style: Theme.of(context).primaryTextTheme.button),
-            onPressed: () {
-              _onSavePressed(context);
-            },
-          ),
-          new IconButton(icon: const Icon(Icons.more_vert), onPressed: () {})
-        ],
-      ),
-      body: buildForm(context),
+      key: scaffoldKey,
+      appBar: new AppBar(title: Text(title), actions: _computeActions()),
+      body: _buildBody(context),
     );
   }
 
-  Db get db => widget.db;
-
-  void _onSavePressed(BuildContext context) {
-    db.put(_buildContact());
-    Navigator.pop(context);
+  String get title {
+    if (_isDirty())
+      return "Edit Contact*";
+    else
+      return "Edit Contact";
   }
 
-  Widget buildForm(BuildContext context) {
-    return new ListView(children: <Widget>[
+  List<Widget> _computeActions() {
+    final List<Widget> a = [];
+    if (_isDirty()) {
+      a.add(new FlatButton(
+        child: Text("SAVE", style: Theme.of(context).primaryTextTheme.button),
+        onPressed: () {
+          _onSavePressed(context);
+        },
+      ));
+    }
+    a.add(new IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}));
+    return a;
+  }
+
+  void _onSavePressed(BuildContext context) {
+    Navigator.pop(context, _buildContact());
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return _buildForm(context);
+  }
+
+  Form _buildForm(BuildContext context) {
+    ListView listView = new ListView(children: <Widget>[
       const SizedBox(height: 24.0),
       new ListTile(
         title: new TextField(
@@ -169,6 +210,29 @@ class _ContactEditPageState extends SsState<ContactEditPage> {
         trailing: Text(describeEnum(col)),
       )
     ]);
+
+    return new Form(
+        key: _formKey,
+        child: listView,
+        onWillPop: () async {
+          if (_isDirty()) {
+            bool save = await _showOkCancelDialog(
+                msg: "Your changes have not been saved?", cancelText: "Discard", okText: "Save");
+            if (save) {
+              Navigator.pop(context, _buildContact());
+              return false;
+            } else {
+              return true;
+            }
+          }
+          return true;
+        });
+  }
+
+  Future<bool> _showOkCancelDialog(
+      {@required String msg, String title = "Confirm", String okText = "Ok", String cancelText = "Cancel"}) async {
+    return showOkCancelDialog(
+        context: scaffoldKey.currentContext, msg: msg, title: title, okText: okText, cancelText: cancelText);
   }
 }
 

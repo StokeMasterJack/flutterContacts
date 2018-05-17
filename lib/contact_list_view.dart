@@ -25,12 +25,11 @@ class ContactListView extends SsStatelessWidget {
       return Center(child: Text("You have no favorites"));
     }
 
-    return new ListView.builder(
-        itemCount: contacts.length,
-        itemBuilder: (context, index) => buildContactTile(context, contacts[index]));
+    return new ListView.builder(itemCount: contacts.length, itemBuilder: buildContactTile);
   }
 
-  Widget buildContactTile(BuildContext context, Contact contact) {
+  Widget buildContactTile(BuildContext context, int index) {
+    Contact contact = contacts[index];
     bool anySelected = selected.isNotEmpty;
     bool thisSelected = selected.contains(contact.id);
 
